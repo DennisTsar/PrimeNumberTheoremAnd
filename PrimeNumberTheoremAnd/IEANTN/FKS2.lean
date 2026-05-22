@@ -9,6 +9,11 @@ import PrimeNumberTheoremAnd.IEANTN.FioriKadiriSwidinsky.FioriKadiriSwidinsky
 import PrimeNumberTheoremAnd.IEANTN.BKLNW.BKLNW
 import PrimeNumberTheoremAnd.IEANTN.RosserSchoenfeld.RosserSchoenfeldPrime
 import PrimeNumberTheoremAnd.IEANTN.LogTables
+-- import PrimeNumberTheoremAnd.Consequences
+-- import Mathlib.Tactic.NormNum.NatFactorial
+-- import Batteries.Tactic.ShowUnused
+
+-- set_option linter.unusedVariables.analyzeTactics true
 
 blueprint_comment /--
 \section{The implications of FKS2}\label{fks2-sec}
@@ -24,6 +29,161 @@ for all $x \geq x_0$ and certain specific numerical choices of $x_0$ and $\varep
 -/
 
 open Real MeasureTheory Chebyshev
+
+-- Taylor polynomial of degree 10 for exp
+noncomputable def P10 (u : ℝ) : ℝ :=
+  ∑ k ∈ Finset.range 11, u ^ k / (Nat.factorial k)
+
+-- Exact closed-form integral of P10(u)/u^2 over [a,b] (a>0)
+noncomputable def LB (a b : ℝ) : ℝ :=
+  (1 / a - 1 / b) + (Real.log b - Real.log a)
+  + (∑ k ∈ Finset.Icc 2 10,
+      (1 / (Nat.factorial k : ℝ)) * ((b ^ (k - 1) - a ^ (k - 1)) / (k - 1)))
+
+noncomputable def LBcon (U0 L1 : ℝ) : ℝ :=
+  (1 / U0 - 1 / L1) + (Real.log L1 - Real.log U0)
+  + (∑ k ∈ Finset.Icc 2 10,
+      (1 / (Nat.factorial k : ℝ)) * ((L1 ^ (k - 1) - U0 ^ (k - 1)) / (k - 1)))
+
+noncomputable def U0 : ℝ := (287209 : ℝ) / 414355 + 1 / 10 ^ 10  -- (upper bound for log 2)
+noncomputable def L1 : ℝ := 1.88403  -- (lower bound for log 6.58)
+
+-- TODO: add to Consequences.lean
+-- private lemma log2_pos : 0 < log 2 := by norm_num [Real.log_pos]
+
+private lemma log658_pos : 0 < log 6.58 := by norm_num [Real.log_pos]
+
+private lemma log2_le_log658 : log 2 ≤ log 6.58 := Real.log_le_log (by norm_num) (by norm_num)
+
+private lemma integral_Icc_logSq_eq :
+    ∫ t in Set.Icc 2 6.58, 1 / log t ^ 2 = ∫ u in Set.Icc (log 2) (log 6.58), exp u / u ^ 2 := by
+  have hsub : ∫ u in log 2..log 6.58, (log (exp u) ^ 2)⁻¹ * exp u =
+      ∫ t in exp (log 2)..exp (log 6.58), (log t ^ 2)⁻¹ := by
+    simp_rw [← Function.comp_apply (f := fun t => (log t ^ 2)⁻¹)]
+    apply intervalIntegral.integral_comp_mul_deriv' (fun x _ ↦ hasDerivAt_exp x) continuousOn_exp
+    have (x) (hx : x ∈ rexp '' Set.uIcc (log 2) (log 6.58)) : 1 < x ∧ log x ^ 2 ≠ 0 := by
+      rw [Set.uIcc_of_le log2_le_log658, continuousOn_exp.image_Icc_of_monotoneOn log2_le_log658
+        (exp_monotone.monotoneOn _), Set.mem_Icc, exp_log two_pos] at hx
+      exact ⟨by linarith, by positivity [Real.log_pos (show 1 < x by linarith)]⟩
+    fun_prop (disch := grind)
+  rw [Real.exp_log two_pos, Real.exp_log (by positivity), intervalIntegral.integral_of_le
+    log2_le_log658, intervalIntegral.integral_of_le (by norm_num)] at hsub
+  simp [integral_Icc_eq_integral_Ioc, ← hsub, div_eq_mul_inv, mul_comm]
+
+-- private lemma integral_Icc_logSq_eq' :
+--     ∫ t in 2..6.58, 1 / log t ^ 2 = ∫ u in log 2..log 6.58, exp u / u ^ 2 := by
+--   let a : ℝ := log 2
+--   let b : ℝ := log 6.58
+--   have hab : a ≤ b := Real.log_le_log (by norm_num) (by norm_num)
+--   have hsub : ∫ u in a..b, (log (rexp u) ^ 2)⁻¹ * exp u = ∫ t in (exp a)..(exp b), (log t ^ 2)⁻¹ := by
+--     simp_rw [← Function.comp_apply (f := fun t => (log t ^ 2)⁻¹)]
+--     apply intervalIntegral.integral_comp_mul_deriv' (fun x _ ↦ hasDerivAt_exp x) continuousOn_exp
+--     have : ∀ x ∈ rexp '' uIcc a b, 1 < x ∧ log x ^ 2 ≠ 0 := by
+--       intro x hx
+--       rw [uIcc_of_le hab, continuousOn_exp.image_Icc_of_monotoneOn hab (exp_monotone.monotoneOn _),
+--         mem_Icc, exp_log (by positivity)] at hx
+--       exact ⟨by linarith, by positivity [Real.log_pos (show 1 < x by linarith)]⟩
+--     fun_prop (disch := grind)
+--   rw [Real.exp_log (by norm_num), Real.exp_log (by norm_num)] at hsub
+--   simp [← hsub, a, b, div_eq_mul_inv, mul_comm]
+
+seal ContinuousOn in -- improve `fun_prop` performance
+private lemma integral_exp_over_u2_ge_integral_P10_over_u2 :
+    ∫ u in Set.Icc (log 2) (log 6.58), exp u / u ^ 2
+      ≥ ∫ u in Set.Icc (log 2) (log 6.58), P10 u / u ^ 2 := by
+  have (x) (hx : x ∈ Set.Icc (log 2) (log 6.58)) : x > 0 := by
+    linarith [log2_pos, Set.mem_Icc.mp hx]
+  refine setIntegral_mono_on₀ ?_ ?_ nullMeasurableSet_Icc ?_
+  · unfold P10
+    apply ContinuousOn.integrableOn_Icc
+    fun_prop (disch := grind [LT.lt.ne', Nat.factorial_ne_zero])
+  · apply ContinuousOn.integrableOn_Icc
+    fun_prop (disch := grind [LT.lt.ne'])
+  · intro x hx
+    refine div_le_div_of_nonneg_right ?_ (sq_nonneg x)
+    rw [P10, Real.exp_eq_exp_ℝ, NormedSpace.exp_eq_tsum_div]
+    exact (Real.summable_pow_div_factorial _).sum_le_tsum _ (fun i hi ↦ by positivity [this x hx])
+
+private lemma integral_P10_over_u2_eq_LB :
+    ∫ u in Set.Icc (log 2) (log 6.58), (P10 u) / u ^ 2 = LB (log 2) (log 6.58) := by
+  unfold P10 LB
+  simp_rw [Finset.sum_div]
+  rw [integral_Icc_eq_integral_Ioc, ← intervalIntegral.integral_of_le log2_le_log658,
+    intervalIntegral.integral_finset_sum ?_]
+  · simp_rw [Finset.sum_range_eq_add_Ico _ (show 0 < 11 by decide),
+      Finset.sum_eq_sum_Ico_succ_bot (show 1 < 11 by decide), add_assoc]
+    have h0_notMem : 0 ∉ Set.uIcc (log 2) (log 6.58) := Set.notMem_uIcc_of_lt log2_pos log658_pos
+    congr 2
+    · have : ∫ (x : ℝ) in log 2..log 6.58, x ^ (-2 : ℤ) = (log 2)⁻¹ - (log 6.58)⁻¹ := by
+        rw [integral_zpow (Or.inr ⟨by norm_num, h0_notMem⟩)]
+        simp [div_neg, show (-2 : ℝ) + 1 = -1 by norm_num]
+      simpa
+    · field_simp; simp [integral_inv h0_notMem, log_div log658_pos.ne' log2_pos.ne']
+    · apply Finset.sum_congr_of_eq_on_inter (by decide) (by decide)
+      intro k _ hk
+      rw [Finset.mem_Icc] at hk
+      have : Set.EqOn (fun x => x ^ k / (k.factorial : ℝ) / x ^ 2)
+          (1 / (k.factorial : ℝ) * · ^ (k - 2)) (Set.uIcc (log 2) (log 6.58)) := by
+        intro x hx
+        have : x ≠ 0 := fun hx' => h0_notMem (hx' ▸ hx)
+        grind [zpow_natCast, zpow_natCast_sub_natCast₀ this k 2]
+      simp [intervalIntegral.integral_congr this, show k - 2 + 1 = k - 1 by lia,
+        ← Nat.cast_add_one (k - 2), Nat.zero_lt_of_lt hk.1]
+  · intro i hi
+    apply ContinuousOn.intervalIntegrable_of_Icc log2_le_log658
+    have (x) (hx : x ∈ Set.Icc (log 2) (log 6.58)) : x ≠ 0 := by
+      linarith [Set.mem_Icc.mp hx, log2_pos]
+    fun_prop (disch := grind)
+
+private lemma log2_le_U0 : log 2 ≤ U0 := tsub_le_iff_left.mp (abs_le.mp log_two_near_10).2
+
+private lemma L1_le_log658 : L1 ≤ log 6.58 := by
+  have hlog_decomp : log 6.58 = 3 * log 2 + log (1 - 71/ 400) := by
+    rw [← log_rpow, ← log_mul] <;> norm_num
+  have : |(71 / 400 : ℝ)| < 1 := by norm_num
+  have := abs_le.mp (Real.abs_log_sub_add_sum_range_le this 7) |>.1
+  rw [← tsub_le_iff_left] at this
+  grw [hlog_decomp, ← this, ← log_two_gt_d9]
+  norm_num [L1]
+
+private lemma LB_ge_LBcon :
+    LB (log 2) (log 6.58) ≥ LBcon U0 L1 := by
+  unfold LB LBcon
+  have : 0 < L1 := by norm_num [L1]
+  gcongr <;> simp [log2_le_U0, L1_le_log658]
+  grind
+
+private lemma LBcon_gt_two_div_L0 : LBcon U0 L1 > 2 / log 2 := by
+  have hlogU0 : log U0 ≤ -0.3665 := by
+    have : |1 - U0| < 1 := by norm_num [U0]
+    have := abs_le.mp (Real.abs_log_sub_add_sum_range_le this 10) |>.2
+    rw [← le_sub_iff_add_le', sub_sub_self] at this
+    grw [this]
+    norm_num [U0]
+  have hlogL1 : 3167 / 5000 < log L1 := by
+    have hlog_decomp : log L1 = log 2 + log (1 - (1 - L1 / 2)) := by
+      rw [← log_mul] <;> norm_num [L1]
+    have : |1 - L1 / 2| < 1 := by norm_num [L1]
+    have := abs_le.mp (Real.abs_log_sub_add_sum_range_le this 3) |>.1
+    rw [← tsub_le_iff_left] at this
+    grw [hlog_decomp, ← this, ← Real.log_two_gt_d9]
+    norm_num [L1]
+  unfold LBcon
+  rw [← Finset.add_sum_Ico_eq_sum_Icc (by linarith)]
+  repeat rw [Finset.sum_eq_sum_Ico_succ_bot (by linarith) _]
+  grw [hlogU0, ← hlogL1, ← Real.log_two_gt_d9]
+  norm_num [U0, L1]
+
+theorem integral_Icc_one_div_log_sq_gt :
+    ∫ (t : ℝ) in Set.Icc 2 6.58, 1 / (log t) ^ 2 > 2 / log 2 := by
+  have h_integral_ge_LBcon : ∫ (t : ℝ) in Set.Icc 2 6.58, 1 / (log t) ^ 2 ≥ LBcon U0 L1 := by
+    calc
+      _ = (∫ u in Set.Icc (log 2) (log 6.58), exp u / u ^ 2) := integral_Icc_logSq_eq
+      _ ≥ (∫ u in Set.Icc (log 2) (log 6.58), (P10 u) / u ^ 2) := integral_exp_over_u2_ge_integral_P10_over_u2
+      _ = LB (log 2) (log 6.58) := integral_P10_over_u2_eq_LB
+      _ ≥ LBcon U0 L1 := LB_ge_LBcon
+  grw [h_integral_ge_LBcon]
+  apply LBcon_gt_two_div_L0
 
 namespace FKS2
 
@@ -54,24 +214,28 @@ $$ \frac{d}{dx} g(a, b, c, x) = \left( -a \log(x) + b + \frac{c}{2}\sqrt{\log(x)
   (discussion := 610)]
 theorem lemma_10_substep {a b c x : ℝ} (hx : x > 1) :
   deriv (g_bound a b c) x =
-    (-a * log x + b + (c / 2) * sqrt (log x)) * x ^ (-a - 1) * (log x) ^ (b - 1) * exp (c * sqrt (log x)) := by
-      have : log x ≠ 0 := by simp; grind
-      have h_prod_rule : deriv (fun x ↦ x ^ (-a) * (log x) ^ b * exp (c * sqrt (log x))) x =
-        (deriv (fun x ↦ x ^ (-a)) x) * (log x) ^ b * exp (c * sqrt (log x)) +
-        x ^ (-a) * (deriv (fun x ↦ (log x) ^ b) x) * exp (c * sqrt (log x)) +
-        x ^ (-a) * (log x) ^ b * (deriv (fun x ↦ exp (c * sqrt (log x))) x) := by
-          rw [deriv_fun_mul, deriv_fun_mul]
-          · ring
-          all_goals fun_prop (disch := grind)
-      unfold g_bound
-      rw [h_prod_rule]
-      norm_num [ show x ≠ 0 by linarith, show log x ≠ 0 by exact ne_of_gt ( log_pos hx ), sqrt_eq_rpow, rpow_sub_one, mul_assoc, mul_comm, mul_left_comm, div_eq_mul_inv ] ; ring_nf
-      norm_num [ ne_of_gt ( log_pos hx ) ]
-      rw [_root_.deriv_exp (by fun_prop (disch := grind))]
-      simp only [deriv_const_mul_field']
-      rw [_root_.deriv_rpow_const (by fun_prop (disch := grind)) (by grind), deriv_log]
-      ring_nf
-      rw [ show ( -1 / 2 : ℝ  ) = ( 1 / 2 : ℝ ) - 1 by norm_num, rpow_sub ( log_pos hx ) ] ; norm_num ; ring
+    (-a * log x + b + (c / 2) * sqrt (log x)) * x ^ (-a - 1) * (log x) ^ (b - 1)
+      * exp (c * sqrt (log x)) := by
+  have : log x ≠ 0 := by simp; grind
+  have h_prod_rule : deriv (fun x ↦ x ^ (-a) * (log x) ^ b * exp (c * sqrt (log x))) x =
+    (deriv (fun x ↦ x ^ (-a)) x) * (log x) ^ b * exp (c * sqrt (log x)) +
+    x ^ (-a) * (deriv (fun x ↦ (log x) ^ b) x) * exp (c * sqrt (log x)) +
+    x ^ (-a) * (log x) ^ b * (deriv (fun x ↦ exp (c * sqrt (log x))) x) := by
+      rw [deriv_fun_mul, deriv_fun_mul]
+      · ring
+      all_goals fun_prop (disch := grind)
+  unfold g_bound
+  rw [h_prod_rule]
+  norm_num [show x ≠ 0 by linarith, (log_pos hx).ne', sqrt_eq_rpow, rpow_sub_one, mul_assoc,
+    mul_comm, mul_left_comm, div_eq_mul_inv]
+  ring_nf
+  norm_num [(log_pos hx).ne']
+  rw [_root_.deriv_exp (by fun_prop (disch := grind))]
+  simp only [deriv_const_mul_field']
+  rw [_root_.deriv_rpow_const (by fun_prop (disch := grind)) (by grind), deriv_log]
+  ring_nf
+  rw [ show ( -1 / 2 : ℝ  ) = ( 1 / 2 : ℝ ) - 1 by norm_num, rpow_sub ( log_pos hx ) ] ;
+  norm_num ; ring
 
 @[blueprint
   "fks2-lemma-10-substep-2"
@@ -89,10 +253,7 @@ theorem lemma_10_substep_2 {a b c x : ℝ} (hx : x > 1) :
   have hpos : 0 < x ^ (-a - 1) * (log x) ^ (b - 1) * exp (c * sqrt (log x)) := by positivity
   rw [show ∀ y, y * x ^ (-a - 1) * (log x) ^ (b - 1) * exp (c * sqrt (log x)) =
       y * (x ^ (-a - 1) * (log x) ^ (b - 1) * exp (c * sqrt (log x))) from fun _ ↦ by ring]
-  rw [mul_neg_iff]
-  constructor <;> intro h
-  · rcases h with ⟨-, hc⟩ | ⟨h, -⟩ <;> linarith
-  · exact Or.inr ⟨by linarith, hpos⟩
+  grind [mul_neg_iff]
 
 @[blueprint
   "fks2-lemma-10a"
@@ -105,11 +266,10 @@ theorem lemma_10_substep_2 {a b c x : ℝ} (hx : x > 1) :
 theorem lemma_10a {a b c : ℝ} (ha : a > 0) (hb : b < -c ^ 2 / (16 * a)) :
     StrictAntiOn (g_bound a b c) (Set.Ioi 1) := by
   refine strictAntiOn_of_deriv_neg (convex_Ioi 1) (fun x hx ↦ ?_) (fun x hx ↦ ?_)
-  · have : 0 < x := by linarith [hx.out]
-    exact (((continuousAt_id.rpow continuousAt_const (Or.inl this.ne')).mul
-      ((continuousAt_log this.ne').rpow continuousAt_const (Or.inl (log_pos hx.out).ne'))).mul
-      (continuous_exp.continuousAt.comp (continuousAt_const.mul
-      (continuous_sqrt.continuousAt.comp (continuousAt_log this.ne'))))).continuousWithinAt
+  · apply ContinuousAt.continuousWithinAt
+    unfold g_bound
+    have : log x ≠ 0 := log_pos (by grind) |>.ne'
+    fun_prop (disch := grind)
   · rw [interior_Ioi] at hx; rw [lemma_10_substep_2 hx]
     let t := sqrt (log x)
     have : -a * t^2 + c/2 * t + b = -a * (t - c/(4*a))^2 + (b + c^2/(16*a)) := by grind
@@ -131,20 +291,43 @@ theorem lemma_10b {a b c : ℝ} (ha : a > 0) (hc : c > 0) (hb : b ≥ -c ^ 2 / (
   have h_deriv_neg : ∀ x > exp ((c / (4 * a) + 1 / (2 * a) * sqrt (c ^ 2 / 4 + 4 * a * b)) ^ 2),
       deriv (g_bound a b c) x < 0 := by
     intro x hx
+    rw [lemma_10_substep_2 (lt_trans (by norm_num; positivity) hx)]
     have h_sqrt : sqrt (log x) > c / (4 * a) + 1 / (2 * a) * sqrt (c ^ 2 / 4 + 4 * a * b) :=
       lt_sqrt_of_sq_lt (by simpa using log_lt_log (by positivity) hx)
-    have h_quadratic : -a * (sqrt (log x)) ^ 2 + (c / 2) * sqrt (log x) + b < 0 := by
-      field_simp at *
-      nlinarith [sqrt_nonneg ((c ^ 2 + a * b * 4 ^ 2) / 4),
-        mul_self_sqrt (show 0 ≤ (c ^ 2 + a * b * 4 ^ 2) / 4 by nlinarith), sqrt_nonneg (log x),
-        mul_self_sqrt (show 0 ≤ log x by
-          exact le_of_not_gt fun h ↦ by
-            rw [sqrt_eq_zero'.mpr h.le] at *; nlinarith [sqrt_nonneg ((c ^ 2 + a * b * 4 ^ 2) / 4),
-              mul_self_sqrt (show 0 ≤ (c ^ 2 + a * b * 4 ^ 2) / 4 by nlinarith)])]
-    convert (lemma_10_substep_2 (show x > 1 from lt_trans (by norm_num; positivity) hx)).2 h_quadratic using 1
+    -- nth_rw 1 [← lt_neg_iff_add_neg]
+    -- rw [← lt_tsub_iff_left]
+    -- rw [show -a * √(log x) ^ 2 = -√(log x) ^ 2 * a by ring]
+    -- nth_grw 2 [hx]
+    -- simp
+    -- rw [sqrt_sq]
+    field_simp at *
+    -- -- simp [mul_add, ← mul_assoc, mul_right_comm]
+    -- ring_nf
+    have : 0 ≤ log x :=by
+      contrapose! h_sqrt with h
+      simp only [sqrt_eq_zero'.mpr h.le, mul_zero, zero_mul]
+      positivity
+    -- simp [sq_sqrt this]
+    -- rw [← lt_neg_iff_add_neg]
+    -- grind
+    -- simp
+    -- group
+    -- have := sqrt_nonneg ((c ^ 2 + a * b * 4 ^ 2) / 4)
+    -- have := show 0 ≤ (c ^ 2 + a * b * 4 ^ 2) / 4 by linarith
+    -- have := (show 0 ≤ log x by
+    --     contrapose! h_sqrt with h
+    --     simp only [sqrt_eq_zero'.mpr h.le, mul_zero, zero_mul]
+    --     positivity)
+    nlinarith [sqrt_nonneg ((c ^ 2 + a * b * 4 ^ 2) / 4),
+      mul_self_sqrt (show 0 ≤ (c ^ 2 + a * b * 4 ^ 2) / 4 by linarith),
+      mul_self_sqrt this]
+  -- refine strictAntiOn_of_deriv_neg (convex_Ioi _) (fun x hx ↦ ?_) (fun x hx ↦ ?_)
+  -- · sorry
+  -- · apply h_deriv_neg
+  --   rwa[interior_Ioi, Set.mem_Ioi] at hx
   intro x hx y hy hxy
   obtain ⟨z, hz⟩ : ∃ z ∈ Set.Ioo x y, deriv (g_bound a b c) z = (g_bound a b c y - g_bound a b c x) / (y - x) := by
-    apply_rules [exists_deriv_eq_slope]
+    apply exists_deriv_eq_slope _ hxy
     · exact continuousOn_of_forall_continuousAt fun z hz ↦ DifferentiableAt.continuousAt
         (differentiableAt_of_deriv_ne_zero (ne_of_lt (h_deriv_neg z (lt_of_lt_of_le hx hz.1))))
     · exact fun u hu ↦ DifferentiableAt.differentiableWithinAt
@@ -1094,6 +1277,10 @@ theorem nu_asymp_le_remark_15_margin (x₀ : ℝ) (h : Real.log x₀ ≥ 1000) :
 
   have h_exp_half :
       exp (2 * Real.sqrt (t / 5.5666305)) * exp (-(1 / 2 : ℝ) * t) ≤ exp (-(1 / 4 : ℝ) * t) := by
+    -- rw [← Real.exp_add]
+    -- refine (Real.exp_le_exp).2 ?_
+    -- grw [h_decay]
+    -- grind--nlinarith [h_decay]
     rw [← Real.exp_add]; exact Real.exp_le_exp.2 (by nlinarith [two_mul_sqrt_div_le_quarter t ht])
   have h_exp_third :
       exp (2 * Real.sqrt (t / 5.5666305)) * exp (-(2 / 3 : ℝ) * t) ≤ exp (-(5 / 12 : ℝ) * t) := by
@@ -1109,20 +1296,23 @@ theorem nu_asymp_le_remark_15_margin (x₀ : ℝ) (h : Real.log x₀ ≥ 1000) :
 
   let powfac : ℝ := ((5.5666305 : ℝ) / t) ^ (3 / 2 : ℝ)
   let expfac : ℝ := exp (2 * Real.sqrt (t / 5.5666305))
-  have hpowfac_nonneg : 0 ≤ powfac := by unfold powfac; positivity
+  -- have hpowfac_nonneg : 0 ≤ powfac := by unfold powfac; positivity
   have hexpfac_nonneg : 0 ≤ expfac := by unfold expfac; positivity
 
   have h_main0 :
       ν_asymp (FKS.A x₀) (3 / 2) 2 5.5666305 x₀
         ≤ (1 / FKS.A x₀) * powfac * expfac *
             ((2 * t) * exp (-(1 / 2 : ℝ) * t) + (5 * t * t) * exp (-(2 / 3 : ℝ) * t)) := by
-    simpa [hhalf_rewrite, hthird_rewrite, ν_asymp, t, powfac, expfac, mul_assoc, mul_left_comm, mul_comm] using
-      mul_le_mul_of_nonneg_left h_inside (by positivity : 0 ≤ (1 / FKS.A x₀) * powfac * expfac)
+    grw [← h_inside]
+    simpa only [ν_asymp, neg_div] using le_rfl
 
-  have h_main1 : ν_asymp (FKS.A x₀) (3 / 2) 2 5.5666305 x₀
-      ≤ powfac * expfac * ((2 * t) * exp (-(1 / 2 : ℝ) * t) + (5 * t * t) * exp (-(2 / 3 : ℝ) * t)) :=
-    h_main0.trans (by simpa [mul_assoc] using mul_le_mul_of_nonneg_right h_invA_le_one (by positivity))
+  have h_main1 :
+      ν_asymp (FKS.A x₀) (3 / 2) 2 5.5666305 x₀
+        ≤ powfac * expfac * ((2 * t) * exp (-(1 / 2 : ℝ) * t) + (5 * t * t) * exp (-(2 / 3 : ℝ) * t)) := by
+    grw [h_main0, h_invA_le_one]
+    simp
 
+  -- grw [h_main1]
   have h_split :
       powfac * expfac * ((2 * t) * exp (-(1 / 2 : ℝ) * t) + (5 * t * t) * exp (-(2 / 3 : ℝ) * t))
         ≤ (2 * (5.5666305 : ℝ)) * exp (-(230 : ℝ)) + (2500 * (5.5666305 : ℝ)) * exp (-(230 : ℝ)) := by
@@ -1982,10 +2172,7 @@ Next, we bound the integral appearing in Sublemma \ref{fks2-eq-17}.
   where
   $$ m(x_0,x) = \max ( (\log x_0)^{(2B-3)/2}, (\log x)^{(2B-3)/2} ). $$
   -/)
-  (proof := /--
-NOTE: in order for the proof to work, some lower bounds on $x_0$ were added to make various limits of integration non-negative.
-
-  Since $\varepsilon_{\theta,\mathrm{asymp}}(t)$ provides an admissible bound on $\theta(t)$ for all $t \geq x_0$, we have
+  (proof := /-- Since $\varepsilon_{\theta,\mathrm{asymp}}(t)$ provides an admissible bound on $\theta(t)$ for all $t \geq x_0$, we have
 \[
 \int_{x_0}^{x} \left| \frac{\theta(t) - t}{t(\log(t))^2} \right| dt \leq \int_{x_0}^{x} \frac{\varepsilon_{\theta,\mathrm{asymp}}(t)}{(\log(t))^2} = \frac{A_\theta}{R^B} \int_{x_0}^{x} (\log(t))^{B-2} \exp\left( -C\sqrt{\frac{\log(t)}{R}} \right) dt.
 \]
@@ -2518,7 +2705,7 @@ theorem psi_le_bound_small (y : ℝ) (hy1 : 1 < y) (hy2 : y < 100) :
     rw [← sqrt_eq_rpow]
     nlinarith [sq_nonneg (sqrt y - 3), mul_self_sqrt (show 0 ≤ y by positivity),
       sqrt_nonneg y, show RS_prime.c₀ = 1.03883 by rfl]
-  grind [RS_prime.theorem_12 (by positivity)]
+  grind [RS_prime.theorem_12]
 
 /-- Bound for `ψ(y)` for medium `y`. -/
 theorem psi_le_bound_medium (y : ℝ) (hy1 : 100 ≤ y) (hy2 : y ≤ 1e19) :
@@ -2528,8 +2715,7 @@ theorem psi_le_bound_medium (y : ℝ) (hy1 : 100 ≤ y) (hy2 : y ≤ 1e19) :
     rw [le_div_iff₀ (sqrt_pos.mpr (by positivity)), show Eψ y = |ψ y - y| / y by rfl,
         div_mul_eq_mul_div, div_le_iff₀] at this <;>
           nlinarith [sqrt_nonneg y, sq_sqrt (by positivity : 0 ≤ y)]
-  rw [← sqrt_eq_rpow]
-  grind
+  grind [← sqrt_eq_rpow]
 
 /-- Bound for `ψ(y)` for large `y`. -/
 theorem psi_le_bound_large (y : ℝ) (hy : 1e19 < y) :
@@ -2788,54 +2974,55 @@ theorem lemma_20_a : StrictMonoOn (fun x ↦ Li x - x / log x) (Set.Ioi 6.58) :=
     rw [interior_Ioi, Set.mem_Ioi] at hx
     rw [deriv_fun_sub (hasDerivAt_Li hx).differentiableAt (by fun_prop (disch := simp_all)),
       deriv_fun_div differentiableAt_fun_id (differentiableAt_log (by linarith)) (hpos x hx)]
-    simp [(hasDerivAt_Li hx).deriv, field, pow_two_pos_of_ne_zero, (hpos x hx), - sub_pos]
+    simp [(hasDerivAt_Li hx).deriv, field, pow_two_pos_of_ne_zero, hpos x hx, - sub_pos]
 
-private lemma Li_ibp {x : ℝ} (hx : x > 2) :
-    Li x - x / log x = -2 / log 2 + ∫ t in (2:ℝ)..x, 1 / (log t) ^ 2 := by
-  have h_parts : ∀ a b : ℝ, 2 ≤ a → a < b →
-      ∫ t in a..b, (1 : ℝ) / Real.log t =
-        (b / Real.log b) - (a / Real.log a) + ∫ t in a..b, (1 : ℝ) / Real.log t ^ 2 := by
-    intro a b _ _
-    rw [intervalIntegral.integral_eq_sub_of_hasDerivAt]
-    rotate_right
-    next => use fun x => x / Real.log x + ∫ t in a..x, 1 / Real.log t ^ 2
-    · norm_num; ring
-    · intro x hx
-      have h_ftc : HasDerivAt (fun x => ∫ t in a..x, (1 : ℝ) / Real.log t ^ 2)
-          (1 / Real.log x ^ 2) x := by
-        apply_rules [intervalIntegral.integral_hasDerivAt_right]
-        · apply_rules [ContinuousOn.intervalIntegrable]
-          exact continuousOn_of_forall_continuousAt fun y hy =>
-            ContinuousAt.div continuousAt_const
-              (ContinuousAt.pow (Real.continuousAt_log (by
-                cases Set.mem_uIcc.mp hy <;>
-                  linarith [Set.mem_Icc.mp (by simpa [le_of_lt, *] using hx)])) _)
-              (ne_of_gt (sq_pos_of_pos (Real.log_pos (by
-                cases Set.mem_uIcc.mp hy <;>
-                  linarith [Set.mem_Icc.mp (by simpa [le_of_lt, *] using hx)]))))
-        · exact Measurable.stronglyMeasurable (by
-            exact Measurable.div measurable_const
-              (Measurable.pow_const Real.measurable_log _))
-            |> fun h => h.stronglyMeasurableAtFilter
-        · exact ContinuousAt.div continuousAt_const
-            (ContinuousAt.pow (Real.continuousAt_log
-              (by cases Set.mem_uIcc.mp hx <;> linarith)) _)
-            (ne_of_gt (sq_pos_of_pos (Real.log_pos
-              (by cases Set.mem_uIcc.mp hx <;> linarith))))
-      convert HasDerivAt.add (HasDerivAt.div (hasDerivAt_id x)
-        (Real.hasDerivAt_log (show x ≠ 0 by cases Set.mem_uIcc.mp hx <;> linarith))
-        (ne_of_gt (Real.log_pos (show x > 1 by
-          cases Set.mem_uIcc.mp hx <;> linarith)))) h_ftc using 1;
-      ring_nf;
-      by_cases hx' : x = 0 <;> simp +decide [sq, mul_assoc, hx'];
-      field_simp
-    · apply_rules [ContinuousOn.intervalIntegrable]
-      exact continuousOn_of_forall_continuousAt fun t ht =>
-        ContinuousAt.div continuousAt_const
-          (Real.continuousAt_log (by cases Set.mem_uIcc.mp ht <;> linarith))
-          (ne_of_gt (Real.log_pos (by cases Set.mem_uIcc.mp ht <;> linarith)))
-  convert congr_arg (fun y => y - x / Real.log x) (h_parts 2 x (by norm_num) hx) using 1
-  ring!
+
+lemma hasDerivAt_Liop {x : ℝ} (hx : x ∈ Set.Ioi 6) : HasDerivAt Li (1 / log x) x := by
+  have hf (x) (hx : x ∈ Set.Ioi 6) : ContinuousAt (fun x ↦ 1 / log x) x := by
+    have := log_pos (by linarith [Set.mem_Ioi.mp hx]) |>.ne'
+    fun_prop (disch := simp_all)
+  refine intervalIntegral.integral_hasDerivAt_right ?_ ?_ (hf x hx)
+  · have := Set.uIcc_of_le (show 2 ≤ x by linarith [Set.mem_Ioi.mp hx])
+    apply intervalIntegral.intervalIntegrable_one_div (by grind [log_eq_zero])
+    fun_prop (disch := grind)
+  · grind [ContinuousAt.stronglyMeasurableAtFilter isOpen_Ioi hf]
+
+lemma hasDerivAt_Liop2 {x : ℝ} (hx : x ∈ Set.Ici 6.58) : HasDerivAt Li (1 / log x) x := by
+  have := hasDerivAt_Liop (by rw [Set.mem_Ioi]; linarith [Set.mem_Ici.mp hx])
+  exact HasDerivAt.congr_deriv this rfl
+
+lemma yoyo  {x : ℝ} (hx : x ≠ 0) (hlog : log x ≠ 0) :
+    HasDerivAt (fun x : ℝ ↦ x / log x) (-(1 - log x) / log x ^ 2) x := by
+  have := ((hasDerivAt_id x).div (Real.hasDerivAt_log hx) hlog)
+  simpa [neg_sub, hx, div_eq_mul_inv, one_div, pow_two, sub_eq_add_neg] using
+    ((hasDerivAt_id x).div (Real.hasDerivAt_log hx) hlog)
+
+lemma hasDerivAt_Liop23 {x : ℝ} (hx : x ∈ Set.Ici 6.58) :
+    HasDerivAt (fun x ↦ Li x - x / log x) (1 / log x ^ 2) x := by
+  have hf (x) (hx : x ∈ Set.Ici 6.58) : ContinuousAt (fun x ↦ 1 / log x) x := by
+    have := log_pos (by linarith [Set.mem_Ici.mp hx]) |>.ne'
+    fun_prop (disch := simp_all)
+  rw [show 1 / log x ^ 2 = 1 / log x - - (1 - log x) / log x ^ 2 by field]
+  apply (hasDerivAt_Liop2 hx).sub
+  -- apply yoyo <;> grind [log_pos]
+  convert HasDerivAt.fun_div (x := x) (hasDerivAt_id _) (hasDerivAt_log _) ?_ using 2
+  · grind [log_pos]
+  · grind [log_pos]
+  · grind [log_pos]
+
+lemma hasDerivAt_Liop23' {x : ℝ} (hx : x ∈ Set.Ioi 6.58) :
+    HasDerivAt (fun x ↦ Li x - x / log x) (1 / log x ^ 2) x := by
+  have hf (x) (hx : x ∈ Set.Ioi 6.58) : ContinuousAt (fun x ↦ 1 / log x) x := by
+    have := log_pos (by linarith [Set.mem_Ioi.mp hx]) |>.ne'
+    fun_prop (disch := simp_all)
+  rw [show 1 / log x ^ 2 = 1 / log x - - (1 - log x) / log x ^ 2 by field]
+  apply (hasDerivAt_Li hx).sub
+  -- apply yoyo <;> grind [log_pos]
+  convert HasDerivAt.fun_div (x := x) (hasDerivAt_id _) (hasDerivAt_log _) ?_ using 2
+  · grind [log_pos]
+  · grind [log_pos]
+  · grind [log_pos]
+
 
 
 /-The following lemmas are used for the proof of lemma_20_b. The first lemma was originally used for
@@ -2851,9 +3038,8 @@ lemma hasDerivAt_Li_sub_div_log {t : ℝ} (ht : 1 < t) :
       exact continuousOn_of_forall_continuousAt fun x hx => ContinuousAt.div continuousAt_const ( Real.continuousAt_log ( by cases Set.mem_uIcc.mp hx <;> linarith ) ) ( ne_of_gt ( Real.log_pos ( by cases Set.mem_uIcc.mp hx <;> linarith ) ) );
     · exact Measurable.stronglyMeasurable ( by exact Measurable.div measurable_const ( Real.measurable_log ) ) |> fun h => h.stronglyMeasurableAtFilter;
     · exact ContinuousAt.div continuousAt_const ( Real.continuousAt_log ( by positivity ) ) ( ne_of_gt ( Real.log_pos ht ) )
-  generalize_proofs at *; (
   convert HasDerivAt.sub h_deriv_Li ( HasDerivAt.div ( hasDerivAt_id t ) ( Real.hasDerivAt_log ( by positivity ) ) ( ne_of_gt ( Real.log_pos ht ) ) ) using 1 ; ring_nf! ; norm_num [ ne_of_gt, Real.log_pos ht ] ; ring_nf!;
-  grind)
+  grind
 
 private lemma summable_li_series_658 :
     Summable fun n : ℕ =>
@@ -2920,49 +3106,72 @@ theorem Li_diff_pos_at_6_58 : Li 6.58 - 6.58 / log 6.58 > 0 := by
   (latexEnv := "lemma")
   (discussion := 714)]
 theorem lemma_20_b {x : ℝ} (hx : x > 6.58) :
-    Li x - x / log x > (x - 6.58) / (log x) ^ 2 ∧ (x - 6.58) / (log x) ^ 2 > 0 :=
-by
-  let f : ℝ → ℝ := fun t ↦ Li t - t / log t
-  obtain ⟨c, hc, h_slope⟩ : ∃ c ∈ Set.Ioo (6.58 : ℝ) x,
-      deriv f c = (f x - f 6.58) / (x - 6.58) := by
-    refine exists_deriv_eq_slope f hx ?_ ?_
-    · intro y hy
-      exact (hasDerivAt_Li_sub_div_log
-        (by rcases Set.mem_Icc.mp hy with ⟨hy₁, hy₂⟩; linarith)).continuousAt.continuousWithinAt
-    · intro y hy
-      exact (hasDerivAt_Li_sub_div_log
-        (by rcases Set.mem_Ioo.mp hy with ⟨hy₁, hy₂⟩; linarith)).differentiableAt.differentiableWithinAt
-  have hc_gt_one : 1 < c := by linarith [hc.1]
-  have h_deriv_c : deriv f c = 1 / (log c) ^ 2 :=
-    (hasDerivAt_Li_sub_div_log hc_gt_one).deriv
-  have hx_sub_pos : 0 < x - 6.58 := by linarith
-  have hf_diff : f x - f 6.58 = (x - 6.58) / (log c) ^ 2 := by
-    have hq : (f x - f 6.58) / (x - 6.58) = 1 / (log c) ^ 2 := by
-      linarith
-    rw [div_eq_iff hx_sub_pos.ne'] at hq
-    rw [hq]
-    ring
-  have hlogc_pos : 0 < log c := Real.log_pos hc_gt_one
-  have hlogx_pos : 0 < log x := Real.log_pos (by linarith)
-  have hlog_lt : log c < log x := Real.log_lt_log (by positivity) hc.2
-  have hsq_lt : (log c) ^ 2 < (log x) ^ 2 := by
-    nlinarith
-  have hinv_lt : 1 / (log x) ^ 2 < 1 / (log c) ^ 2 := by
-    exact one_div_lt_one_div_of_lt (sq_pos_of_pos hlogc_pos) hsq_lt
-  have hmain : (x - 6.58) / (log x) ^ 2 < f x := by
-    rw [← sub_pos]
-    have hbase : 0 < f 6.58 := by
-      simpa [f] using Li_diff_pos_at_6_58
-    have hmul : (x - 6.58) / (log x) ^ 2 <
-        (x - 6.58) / (log c) ^ 2 := by
-      gcongr
-    have hfx : f x = f 6.58 + (x - 6.58) / (log c) ^ 2 := by
-      linarith
-    rw [hfx]
-    linarith
-  have hpos : 0 < (x - 6.58) / (log x) ^ 2 := by
+    Li x - x / log x > (x - 6.58) / (log x) ^ 2 ∧ (x - 6.58) / (log x) ^ 2 > 0 := by
+  -- let f : ℝ → ℝ := fun t ↦ Li t - t / log t
+  -- obtain ⟨c, hc, h_slope⟩ : ∃ c ∈ Set.Ioo (6.58 : ℝ) x,
+  --     deriv f c = (f x - f 6.58) / (x - 6.58) := by
+  --   refine exists_deriv_eq_slope f hx ?_ ?_
+  --   · intro y hy
+  --     exact (hasDerivAt_Li_sub_div_log
+  --       (by rcases Set.mem_Icc.mp hy with ⟨hy₁, hy₂⟩; linarith)).continuousAt.continuousWithinAt
+  --   · intro y hy
+  --     exact (hasDerivAt_Li_sub_div_log
+  --       (by rcases Set.mem_Ioo.mp hy with ⟨hy₁, hy₂⟩; linarith)).differentiableAt.differentiableWithinAt
+  -- have hc_gt_one : 1 < c := by linarith [hc.1]
+  -- have h_deriv_c : deriv f c = 1 / (log c) ^ 2 :=
+  --   (hasDerivAt_Li_sub_div_log hc_gt_one).deriv
+  -- have hx_sub_pos : 0 < x - 6.58 := by linarith
+  -- have hf_diff : f x - f 6.58 = (x - 6.58) / (log c) ^ 2 := by
+  --   have hq : (f x - f 6.58) / (x - 6.58) = 1 / (log c) ^ 2 := by
+  --     linarith
+  --   rw [div_eq_iff hx_sub_pos.ne'] at hq
+  --   rw [hq]
+  --   ring
+  -- have hlogc_pos : 0 < log c := Real.log_pos hc_gt_one
+  -- have hlogx_pos : 0 < log x := Real.log_pos (by linarith)
+  -- have hlog_lt : log c < log x := Real.log_lt_log (by positivity) hc.2
+  -- have hsq_lt : (log c) ^ 2 < (log x) ^ 2 := by
+  --   nlinarith
+  -- have hinv_lt : 1 / (log x) ^ 2 < 1 / (log c) ^ 2 := by
+  --   exact one_div_lt_one_div_of_lt (sq_pos_of_pos hlogc_pos) hsq_lt
+  -- have hmain : (x - 6.58) / (log x) ^ 2 < f x := by
+  --   rw [← sub_pos]
+  --   have hbase : 0 < f 6.58 := by
+  --     simpa [f] using Li_diff_pos_at_6_58
+  --   have hmul : (x - 6.58) / (log x) ^ 2 <
+  --       (x - 6.58) / (log c) ^ 2 := by
+  --     gcongr
+  --   have hfx : f x = f 6.58 + (x - 6.58) / (log c) ^ 2 := by
+  --     linarith
+  --   rw [hfx]
+  --   linarith
+  -- have hpos : 0 < (x - 6.58) / (log x) ^ 2 := by
+  --   positivity
+  -- exact ⟨by simpa [f] using hmain, by simpa using hpos⟩
+  have hpos : (Li 6.58 - 6.58 / log 6.58) > 0 := by
+    unfold Li
+    rw [intervalIntegral.integral_of_le (by linarith), ← integral_Icc_eq_integral_Ioc,
+      integral_log_inv_pialt 6.58 (by linarith)]
+    grind [integral_Icc_one_div_log_sq_gt]
+  constructor
+  · have : 0 < x - 6.58 := sub_pos.mpr hx
+    grw [gt_iff_lt, div_eq_inv_mul, ← lt_div_iff₀ this, ← sub_lt_self (Li x - x / log x) hpos]
+
+    -- have := @StrictMonoOn.strictConvexOn_of_deriv
+    -- have := @StrictMonoOn.exists_deriv_lt_slope
+    -- have := StrictConcaveOn.secant_strict_mono
+
+    -- ⊢ log x / x * (Li x - x / log x - (Li x₁ - x₁ / log x₁)) ≤ log x₂ / x₂ * (Li x₂ - x₂ / log x₂ - Li x₁ + x₁ / log x₁)
+    obtain ⟨c, hc⟩ := exists_hasDerivAt_eq_slope _ _ hx
+      (HasDerivAt.continuousOn (fun x hx => hasDerivAt_Liop23 (by simp_all)))
+      (fun c hc => (hasDerivAt_Liop23' (x := c) (by grind)))
+    rw [← hc.2, one_div]
+    apply inv_strictAnti₀
+    · positivity [log_pos (show 1 < c by linarith [Set.mem_Ioo.mp hc.1])]
+    · gcongr <;> grind [log_pos]
+  · have : log x > 0 := log_pos (by linarith)
+    have : x - 6.58 > 0 := by linarith
     positivity
-  exact ⟨by simpa [f] using hmain, by simpa using hpos⟩
 
 -- Integrability of Eθ t / log t ^ 2
 private lemma Eθ_integrable {x y : ℝ} (hx : 2 ≤ x) (hy : x ≤ y) :
@@ -3094,6 +3303,86 @@ Now we can start estimating $E_\pi$.  We make the following running hypotheses. 
 
 
 
+    -- let f := fun x => Li x - x / log x
+    -- change (log x ^ 2)⁻¹ < (f x - f 6.58) / (x - 6.58)
+    -- rw [← slope_def_field, ← one_div]
+    -- -- rw [← (hasDerivAt_Liop23 (x := x) (by grind)).deriv]
+    -- have hpos (x : ℝ) (hx : x ∈ Set.Ici 6.58) :=
+    --   log_pos (show 1 < x by linarith [Set.mem_Ici.mp hx]) |>.ne'
+    -- apply StrictConcaveOn.lt_slope_of_hasDerivAt (S := Set.Ici 6.58) (hf' := hasDerivAt_Liop23 (x := x) (by grind))
+    -- ·
+    --   -- apply?
+    --   refine strictConcaveOn_of_slope_strict_anti_adjacent ?_ ?_
+    --   · exact convex_Ici 6.58
+    --   intro x y z hx hz hxy hyz
+    --   refine StrictAntiOn.strictConcaveOn_of_deriv ?_ ?_ ?_
+    --   · exact convex_Ici 6.58
+    --   ·
+
+    --     unfold f
+    --     apply HasDerivAt.continuousOn (by apply hasDerivAt_Liop2) |>.sub
+    --     fun_prop (disch := simp_all)
+    --   · have := (hasDerivAt_Liop23 (x := x) (by grind)).deriv
+    --     unfold f
+    --     refine strictAntiOn_of_deriv_neg ?_ ?_ ?_
+    --     · simp [convex_Ioi]
+    --     · refine continuousOn_of_forall_continuousAt ?_
+    --       intro x hx
+    --       simp at hx
+    --       have := (hasDerivAt_Liop23 (x := x) (by grind)).deriv
+    --       -- fun_prop (disch := grind)
+    --       sorry
+    --     · simp; sorry
+    --     -- refine StrictAnti.strictAntiOn ?_ (interior (Set.Ici 6.58))
+    --     -- refine strictAnti_of_deriv_neg ?_
+    --     -- intro x2
+    --     -- sorry
+    -- · exact Set.self_mem_Ici
+    -- · exact Set.mem_Ici_of_Ioi hx
+    -- · exact RCLike.ofReal_lt_ofReal.mp hx
+
+    -- let f := fun x => Li x - x / log x
+    -- change (log x ^ 2)⁻¹ < (f x - f 6.58) / (x - 6.58)
+    -- rw [← slope_def_field, ← one_div]
+    -- rw [← (hasDerivAt_Liop23 (x := x) (by grind)).deriv]
+    -- refold_let f
+    -- have hpos (x : ℝ) (hx : x ∈ Set.Ici 6.58) :=
+    --   log_pos (show 1 < x by linarith [Set.mem_Ici.mp hx]) |>.ne'
+    -- apply StrictConcaveOn.deriv_lt_slope (S := Set.Ici 6.58)
+    -- · refine StrictAntiOn.strictConcaveOn_of_deriv ?_ ?_ ?_
+    --   · exact convex_Ici 6.58
+    --   ·
+
+    --     unfold f
+    --     apply HasDerivAt.continuousOn (by apply hasDerivAt_Liop2) |>.sub
+    --     fun_prop (disch := simp_all)
+    --   · have := (hasDerivAt_Liop23 (x := x) (by grind)).deriv
+    --     unfold f
+    --     refine strictAntiOn_of_deriv_neg ?_ ?_ ?_
+    --     · simp [convex_Ioi]
+    --     · refine continuousOn_of_forall_continuousAt ?_
+    --       intro x hx
+    --       simp at hx
+    --       have := (hasDerivAt_Liop23 (x := x) (by grind)).deriv
+    --       -- fun_prop (disch := grind)
+    --       sorry
+    --     · simp; sorry
+    --     -- refine StrictAnti.strictAntiOn ?_ (interior (Set.Ici 6.58))
+    --     -- refine strictAnti_of_deriv_neg ?_
+    --     -- intro x2
+    --     -- sorry
+    -- · exact Set.self_mem_Ici
+    -- · exact Set.mem_Ici_of_Ioi hx
+    -- · exact hx
+    -- · unfold f
+    --   apply HasDerivAt.differentiableAt (by apply hasDerivAt_Liop2; exact Set.mem_Ici_of_Ioi hx) |>.sub
+    --   fun_prop (disch := grind)
+
+
+-- #show_unused lemma_20_b
+
+#print axioms lemma_20_b
+
 @[blueprint
   "fks2-theorem-6-1"
   (title := "FKS2 Theorem 6, substep 1")
@@ -3171,10 +3460,11 @@ theorem theorem_6_1 {x₀ x₁ : ℝ} (h : x₁ ≥ max x₀ 14)
 
 
 
+-- TODO: this is also what i attempted in hasderivat_liop
 /- The following 2 lemmas are used for theorem_6_3.
 -/
 
-
+--TODO: this is the same as Li_identity'
 lemma integral_one_div_log_sq {a b : ℝ} (ha : 1 < a) (hab : a ≤ b) :
     ∫ t in a..b, 1 / (log t) ^ 2 = (Li b - b / log b) - (Li a - a / log a) := by
   rw [ intervalIntegral.integral_eq_sub_of_hasDerivAt ];
@@ -3649,19 +3939,63 @@ theorem theorem_6_2 {x₁ : ℝ} (h : x₁ ≥ 14) (x : ℝ) (hx : x ≥ x₁) :
 theorem theorem_6_3 {x₁ : ℝ} (h : x₁ ≥ 14) (x₂ : ℝ) (hx₂ : x₂ ≥ x₁) (x : ℝ) (hx : x ≥ x₁) (hx' : x ≤ x₂) (hx₂' : x₂ ≤ x₁ * log x₁) :
   (log x / x) * ∫ t in x₁..x, 1 / (log t) ^ 2 ≤
     (log x₂ / x₂) * (Li x₂ - x₂ / log x₂ - Li x₁ + x₁ / log x₁) := by
-    have h_integral_le_integral : (log x / x) * ∫ t in x₁..x, 1 / (log t) ^ 2 ≤ (log x / x) * (Li x - x / log x - Li x₁ + x₁ / log x₁) := by
-      rw [ integral_one_div_log_sq ] <;> try linarith;
-    have h_monotone : MonotoneOn (fun t => (log t / t) * (Li t - t / log t - Li x₁ + x₁ / log x₁)) (Set.Icc x₁ (x₁ * log x₁)) := by
-      have h_monotone : MonotoneOn (fun t => (log t / t) * ∫ s in x₁..t, 1 / (log s) ^ 2) (Set.Icc x₁ (x₁ * log x₁)) := by
-        apply_rules [ h_monotoneOn ];
-    -- Using the fact that the integral of 1/(log t)^2 from x₁ to t is equal to Li t - t / log t - Li x₁ + x₁ / log x₁, we can rewrite the function.
-      have h_integral_eq : ∀ t ∈ Set.Icc x₁ (x₁ * log x₁), ∫ s in x₁..t, 1 / (log s) ^ 2 = Li t - t / log t - Li x₁ + x₁ / log x₁ := by
-        intros t ht; rw [ integral_one_div_log_sq ]
-        · ring
-        · linarith
-        · linarith [ ht.1 ]
-      exact fun t ht u hu htu => by simpa only [ h_integral_eq t ht, h_integral_eq u hu ] using h_monotone ht hu htu;
-    exact h_integral_le_integral.trans ( h_monotone ⟨ by linarith, by linarith ⟩ ⟨ by linarith, by linarith ⟩ hx' )
+  have hx₁_gt_one : 1 < x₁ := by nlinarith [h]
+  have hlog_gt_one_of_ge : ∀ y, x₁ ≤ y → 1 < log y := by
+    intro y hy
+    grw [Real.lt_log_iff_exp_lt, Real.exp_one_lt_d9] <;> linarith
+
+  have hderiv : ∀ y, x₁ ≤ y → HasDerivAt
+      (fun u => log u / u * (Li u - u / log u - Li x₁ + x₁ / log x₁))
+      (1 / (y * log y) - (log y - 1) / y ^ 2 * (Li y - y / log y - Li x₁ + x₁ / log x₁)) y := by
+    intro y hy
+    have hyne : y ≠ 0 := by linarith
+    have h₁ : HasDerivAt (fun u => log u / u) ((1 - log y) / y ^ 2) y := by
+      simpa [hyne] using (Real.hasDerivAt_log hyne).div (hasDerivAt_id y)
+    have h₂ : HasDerivAt (fun u => Li u - u / log u - Li x₁ + x₁ / log x₁) (1 / log y ^ 2) y := by
+      simpa using hasDerivAt_Li_sub_div_log (by linarith)
+    convert h₁.mul h₂ using 1
+    simp [field]
+    ring
+
+  rw [integral_one_div_log_sq (a := x₁) (b := x) hx₁_gt_one hx, ← sub_add]
+  rcases eq_or_lt_of_le hx' with rfl | hlt
+  · simp
+  obtain ⟨c, hc, hc_slope⟩ := exists_hasDerivAt_eq_slope _ _ hlt
+    (HasDerivAt.continuousOn (fun t ht => (hderiv t (by grind))))
+    (fun c hc => (hderiv c (by grind)))
+  rw [eq_div_iff (by grind)] at hc_slope
+  rw [← sub_nonneg, ← hc_slope]
+  have : (x₂ - x) > 0 := by grind
+  have hcx₁ : x₁ ≤ c := le_trans hx (le_of_lt hc.1)
+  have h6 := theorem_6_2 (x₁ := x₁) h c hcx₁
+  have hlogcsubpos : 1 < log c := by
+    grw [Real.lt_log_iff_exp_lt, Real.exp_one_lt_d9] <;> grind
+  have : 0 < log c - 1 := by linarith
+  have : 0 < c := by grind
+  rw [integral_one_div_log_sq (a := x₁) (b := c) hx₁_gt_one hcx₁, ← sub_add] at h6
+  have : 0 ≤ (1 / (c * log c) - (log c - 1) / c ^ 2 * (Li c - c / log c - Li x₁ + x₁ / log x₁)) := by
+    rw [← Real.log_mul (by linarith) (Real.log_pos (by linarith)).ne'] at h6
+    have h6c : log c / c * (Li c - c / log c - Li x₁ + x₁ / log x₁) < 1 / (log c - 1) := by
+      grw [h6]
+      gcongr
+      grind
+    rw [← lt_div_iff₀' (by positivity)] at h6c
+    grw [h6c]
+    simp [field]
+  positivity
+    -- have h_integral_le_integral : (log x / x) * ∫ t in x₁..x, 1 / (log t) ^ 2 ≤ (log x / x) * (Li x - x / log x - Li x₁ + x₁ / log x₁) := by
+    --   rw [ integral_one_div_log_sq ] <;> try linarith;
+    -- have h_monotone : MonotoneOn (fun t => (log t / t) * (Li t - t / log t - Li x₁ + x₁ / log x₁)) (Set.Icc x₁ (x₁ * log x₁)) := by
+    --   have h_monotone : MonotoneOn (fun t => (log t / t) * ∫ s in x₁..t, 1 / (log s) ^ 2) (Set.Icc x₁ (x₁ * log x₁)) := by
+    --     apply_rules [ h_monotoneOn ];
+    -- -- Using the fact that the integral of 1/(log t)^2 from x₁ to t is equal to Li t - t / log t - Li x₁ + x₁ / log x₁, we can rewrite the function.
+    --   have h_integral_eq : ∀ t ∈ Set.Icc x₁ (x₁ * log x₁), ∫ s in x₁..t, 1 / (log s) ^ 2 = Li t - t / log t - Li x₁ + x₁ / log x₁ := by
+    --     intros t ht; rw [ integral_one_div_log_sq ]
+    --     · ring
+    --     · linarith
+    --     · linarith [ ht.1 ]
+    --   exact fun t ht u hu htu => by simpa only [ h_integral_eq t ht, h_integral_eq u hu ] using h_monotone ht hu htu;
+    -- exact h_integral_le_integral.trans ( h_monotone ⟨ by linarith, by linarith ⟩ ⟨ by linarith, by linarith ⟩ hx' )
 
 blueprint_comment /--
 We can merge these sublemmas together after making some definitions. -/
