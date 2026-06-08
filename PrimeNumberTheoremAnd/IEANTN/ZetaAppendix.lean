@@ -222,7 +222,6 @@ private lemma integral_Icc_eq_interval {a b : ℝ} (h : a ≤ b) (f : ℝ → �
   rw [intervalIntegral.integral_of_le h]
   exact MeasureTheory.integral_Icc_eq_integral_Ioc
 
-set_option backward.isDefEq.respectTransparency false in
 theorem integral_power_phase_ibp (σ : ℝ) (φ : ℝ → ℝ) (a b : ℝ) (hab : a < b) (ha_pos : 0 < a)
     (h_phi_ne : ∀ t ∈ Set.Icc a b, deriv φ t ≠ 0)
     (h_phi_diff : ∀ t ∈ Set.Icc a b, DifferentiableAt ℝ φ t)
@@ -1022,7 +1021,6 @@ theorem lemma_IBP_bound_abs_antitone {a b : ℝ} (hab : a < b) (g : ℝ → ℝ)
     rw [abs_of_nonpos (hsign b <| right_mem_Icc.mpr hab.le), abs_of_nonpos (hsign a <| left_mem_Icc.mpr hab.le)]
     ring
 
-set_option backward.isDefEq.respectTransparency false in
 @[blueprint
   "lem:aachmonophase"
   (title := "Non-stationary phase estimate")
@@ -1237,7 +1235,6 @@ lemma deriv_e {φ : ℝ → ℝ} {t : ℝ} (hφ : DifferentiableAt ℝ φ t) :
   convert (Complex.hasDerivAt_exp _).comp t (hφ.hasDerivAt.ofReal_comp.const_mul (2 * π * I)) using 1
   ring
 
-set_option backward.isDefEq.respectTransparency false in
 theorem lemma_aachfour (s : ℂ) (hsigma : 0 ≤ s.re) (ν : ℝ) (hν : ν ≠ 0) (a b : ℝ)
     (ha : a > |s.im| / (2 * π * |ν|)) (hb : b > a) :
     let φ : ℝ → ℝ := fun t ↦ ν * t - (s.im / (2 * π)) * Real.log t
@@ -1674,7 +1671,6 @@ It is this easy step that gives us quadratic decay on $n$. It is just as
 in the proof of van der Corput's Process B in, say, \cite[I.6.3, Thm.~4]{zbMATH06471876}.
 -/
 
-set_option backward.isDefEq.respectTransparency false in
 @[blueprint
   "prop:applem"
   (title := "Estimating a Fourier cosine integral")
@@ -1822,7 +1818,6 @@ theorem lemma_abadeulmac' {b : ℕ} (hb : 0 < b) {s : ℂ}
   push_cast
   ring_nf
 
-set_option backward.isDefEq.respectTransparency false in
 @[blueprint
   "lem:abadeulmac"
   (title := "Identity for a partial sum of zeta(s)")
@@ -2022,7 +2017,6 @@ lemma lemma_abadsumas_integrable_explog {s : ℂ} {a b : ℝ} (ha : 0 < a) (hab 
       exact fun _ hx => ne_of_gt (lt_of_lt_of_le ha hx.1)
   · dsimp [e]; fun_prop
 
-set_option backward.isDefEq.respectTransparency false in
 lemma lemma_abadsumas_sum_fourier (s : ℂ) {a b : ℝ} (ha : 0 < a)
     (hab : a < b) :
     let f : ℝ → ℂ := fun y ↦
@@ -3723,7 +3717,6 @@ theorem lemma_abadeuleulmit1 {z : ℂ} (hz : z ∈ integerComplement) :
       · simpa using asummable hz
       · convert asummable'' hz <;> aesop
 
-set_option backward.isDefEq.respectTransparency false in
 lemma lemma_abadeulmit2_integral_tsum_inv_sub_int_sq {z w : ℂ}
   (_hz : z ∈ integerComplement)
   (hw : w ∈ integerComplement)
@@ -4148,7 +4141,6 @@ lemma lemma_abadeulmit2_continuousAt_integral_tsum_one_div_sub_int_sq {z : ℂ}
       exact Metric.closedBall_mem_nhds z hε'
     · fun_prop
 
-set_option backward.isDefEq.respectTransparency false in
 lemma lemma_abadeulmit2_tsum_one_div_sub_int_sq {z : ℂ} (hz : z ∈ integerComplement) :
   ∑' (n : ℤ), 1 / (z - n) ^ 2 =
   deriv (fun w ↦ -π * Complex.cot (π * w)) z := by

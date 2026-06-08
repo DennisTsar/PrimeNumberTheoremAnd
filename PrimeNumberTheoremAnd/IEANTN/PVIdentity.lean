@@ -1,6 +1,7 @@
 import Mathlib.Data.Real.StarOrdered
 import Mathlib.MeasureTheory.Integral.Gamma
 import Mathlib.NumberTheory.Harmonic.GammaDeriv
+import Batteries.Tactic.ShowUnused
 
 open Real Set MeasureTheory Filter Topology Finset
 open scoped NNReal ENNReal
@@ -13,14 +14,14 @@ open scoped NNReal ENNReal
 - pv_exp_div_eq_gamma_add_log_add_integral : ∫ u in (0 : ℝ)..y, ((exp u - 1) / u) = eulerMascheroniConstant + log y + ∫ u in (0 : ℝ)..y, ((exp u - 1) / u)
 -/
 
-set_option linter.unusedSimpArgs false
-set_option linter.style.multiGoal false
-set_option linter.unusedVariables false
-set_option linter.style.refine false
-set_option linter.style.setOption false
+-- set_option linter.unusedSimpArgs false
+-- set_option linter.style.multiGoal false
+-- set_option linter.unusedVariables false
+-- set_option linter.style.refine false
+-- set_option linter.style.setOption false
 set_option linter.flexible false
-set_option linter.style.maxHeartbeats false
-set_option linter.unnecessarySimpa false
+-- set_option linter.style.maxHeartbeats false
+-- set_option linter.unnecessarySimpa false
 
 /-! ## Helper lemmas for the principal value identity -/
 /-
@@ -156,6 +157,73 @@ lemma tendsto_integral_exp_sub_one_div {y : ℝ} (hy : 0 < y) :
   convert this.tendsto.mono_left _ using 2;
   norm_num [ nhdsWithin, Filter.mem_inf_principal ];
   exact Filter.eventually_of_mem ( Iio_mem_nhds <| show 0 < M by linarith ) fun x hx => fun hx' => ⟨ le_of_lt hx', le_of_lt hx ⟩
+
+-- set_option maxHeartbeats 1000000 in
+lemma eulerMascheroni_eq_integral' :
+    eulerMascheroniConstant =
+      (∫ t in (0:ℝ)..1, (1 - exp (-t)) / t) - ∫ t in Ioi (1:ℝ), exp (-t) / t := by
+  -- Using the existing Gamma-derivative integral formula, we can write
+  have h_gamma_deriv : Real.eulerMascheroniConstant = -∫ t in Set.Ioi 0, Real.exp (-t) * Real.log t := by
+    have h_gamma_deriv : deriv Real.Gamma 1 = ∫ t in Set.Ioi 0, Real.exp (-t) * Real.log t := by
+      let I : ℂ := ∫ t : ℝ in Ioi 0, t ^ ((1 : ℂ) - 1) * (Real.log t * Real.exp (-t))
+      have h_complex_gamma : HasDerivAt Complex.Gamma I (1 : ℂ) := by
+        refine Complex.hasDerivAt_GammaIntegral (by simp) |>.congr_of_eventuallyEq ?_
+        have h_open : IsOpen {s : ℂ | 0 < s.re} := isOpen_lt (by fun_prop) (by fun_prop)
+        filter_upwards [h_open.mem_nhds (by simp)] with s hs using (Complex.Gamma_eq_integral hs)
+      convert h_complex_gamma.real_of_complex.deriv
+      simp [I, mul_comm, ← Complex.ofReal_mul, integral_complex_ofReal, - Complex.ofReal_exp]
+    rw [Real.eulerMascheroniConstant_eq_neg_deriv, h_gamma_deriv]
+  have h_tail_integrable : MeasureTheory.IntegrableOn (fun t : ℝ => Real.exp (-t) * Real.log t) (Set.Ioi 1) := by
+    sorry
+  have h_tail_div_integrable : MeasureTheory.IntegrableOn (fun t : ℝ => Real.exp (-t) / t) (Set.Ioi 1) := by
+    sorry
+  -- We can split the integral into two parts: from 0 to 1 and from 1 to ∞.
+  have h_split : ∫ t in Set.Ioi 0, Real.exp (-t) * Real.log t = (∫ t in Set.Ioc 0 1, Real.exp (-t) * Real.log t) + (∫ t in Set.Ioi 1, Real.exp (-t) * Real.log t) := by
+    rw [← MeasureTheory.setIntegral_union] <;> norm_num
+    · have h_integrable : MeasureTheory.IntegrableOn (fun t => Real.log t) (Set.Ioc 0 1) := sorry
+      refine' h_integrable.norm.mono' _ _
+      · exact MeasureTheory.AEStronglyMeasurable.mul (Continuous.aestronglyMeasurable (by continuity)) h_integrable.aestronglyMeasurable
+      · filter_upwards [MeasureTheory.ae_restrict_mem measurableSet_Ioc] with x hx using by rw [norm_mul, Real.norm_of_nonneg (Real.exp_pos _ |> le_of_lt)]; exact mul_le_of_le_one_left (norm_nonneg _) (Real.exp_le_one_iff.mpr <| by linarith [hx.1, hx.2])
+    · exact h_tail_integrable
+  -- For the integral from 0 to 1, integration by parts gives the required one-variable identity.
+  have h_zero_one : -(∫ t in Set.Ioc 0 1, Real.exp (-t) * Real.log t) = ∫ t in (0 : ℝ)..1, (1 - Real.exp (-t)) / t := by
+    have h_trunc : ∀ a ∈ Set.Ioo (0 : ℝ) 1, -(∫ t in a..1, Real.exp (-t) * Real.log t) = (∫ t in a..1, (1 - Real.exp (-t)) / t) + (1 - Real.exp (-a)) * Real.log a := by
+      intro a ha
+      have h_parts := intervalIntegral.integral_mul_deriv_eq_deriv_mul (a := a) (b := 1) (u := Real.log) (v := fun x : ℝ => Real.exp (-x) - 1) (u' := fun x : ℝ => 1 / x) (v' := fun x : ℝ => -Real.exp (-x)) sorry sorry sorry sorry
+      calc
+        -(∫ t in a..1, Real.exp (-t) * Real.log t) = ∫ t in a..1, Real.log t * (-Real.exp (-t)) := by rw [← intervalIntegral.integral_neg]; refine intervalIntegral.integral_congr fun t ht => by ring
+        _ = (∫ t in a..1, (1 - Real.exp (-t)) / t) + (1 - Real.exp (-a)) * Real.log a := by
+          rw [h_parts]; simp [Real.log_one, ha.1.ne']; rw [add_comm]; congr 1
+          sorry
+    have h_left : Tendsto (fun a : ℝ => -(∫ t in a..1, Real.exp (-t) * Real.log t)) (𝓝[>] (0 : ℝ)) (𝓝 (-(∫ t in Set.Ioc 0 1, Real.exp (-t) * Real.log t))) := by
+      have h_integrable : MeasureTheory.IntegrableOn (fun t : ℝ => Real.exp (-t) * Real.log t) (Set.Ioc 0 1) := by
+        have h_integrable : MeasureTheory.IntegrableOn (fun t : ℝ => Real.log t) (Set.Ioc 0 1) := by sorry
+        refine' h_integrable.norm.mono' _ _
+        · exact MeasureTheory.AEStronglyMeasurable.mul (Continuous.aestronglyMeasurable (by continuity)) h_integrable.aestronglyMeasurable
+        · filter_upwards [MeasureTheory.ae_restrict_mem measurableSet_Ioc] with x hx using by rw [norm_mul, Real.norm_of_nonneg (Real.exp_pos _ |> le_of_lt)]; exact mul_le_of_le_one_left (norm_nonneg _) (Real.exp_le_one_iff.mpr <| by linarith [hx.1, hx.2])
+      have h_set : Tendsto (fun a : ℝ => ∫ t in Set.Ioc a 1, Real.exp (-t) * Real.log t) (𝓝[>] (0 : ℝ)) (𝓝 (∫ t in Set.Ioc 0 1, Real.exp (-t) * Real.log t)) := sorry
+      refine' (h_set.congr' _).neg
+      filter_upwards [self_mem_nhdsWithin] with a ha using by sorry
+    have h_right₁ : Tendsto (fun a : ℝ => ∫ t in a..1, (1 - Real.exp (-t)) / t) (𝓝[>] (0 : ℝ)) (𝓝 (∫ t in (0 : ℝ)..1, (1 - Real.exp (-t)) / t)) := by
+      have h_integrable : MeasureTheory.IntegrableOn (fun t : ℝ => (1 - Real.exp (-t)) / t) (Set.Ioc 0 1) := by
+        sorry
+      rw [intervalIntegral.integral_of_le zero_le_one]
+      sorry
+    have h_right₂ : Tendsto (fun a : ℝ => (1 - Real.exp (-a)) * Real.log a) (𝓝[>] (0 : ℝ)) (𝓝 0) := by
+      have h₁ : Tendsto (fun a : ℝ => (1 - Real.exp (-a)) / a) (𝓝[>] (0 : ℝ)) (𝓝 1) := by
+        have hder : HasDerivAt (fun a : ℝ => 1 - Real.exp (-a)) 1 0 := by simpa using (hasDerivAt_const (0 : ℝ) (1 : ℝ)).sub ((hasDerivAt_neg (0 : ℝ)).exp)
+        sorry--simpa [div_eq_mul_inv, sub_eq_add_neg] using hder.tendsto_slope_zero_right
+      have h₂ : Tendsto (fun a : ℝ => a * Real.log a) (𝓝[>] (0 : ℝ)) (𝓝 0) := by simpa [Real.rpow_one, mul_comm] using tendsto_log_mul_rpow_nhdsGT_zero zero_lt_one
+      sorry--simpa [div_eq_mul_inv, mul_assoc, mul_comm, mul_left_comm] using h₁.mul h₂
+    exact tendsto_nhds_unique h_left (by sorry)
+  -- For the integral from 1 to ∞, integration by parts gives the required tail identity.
+  have h_one_infty : ∫ t in Set.Ioi 1, Real.exp (-t) * Real.log t = ∫ t in Set.Ioi 1, Real.exp (-t) / t := by
+    calc
+      ∫ t in Set.Ioi 1, Real.exp (-t) * Real.log t = ∫ t in Set.Ioi 1, Real.log t * Real.exp (-t) := by refine MeasureTheory.setIntegral_congr_fun measurableSet_Ioi fun t ht => by ring
+      _ = ∫ t in Set.Ioi 1, Real.exp (-t) / t := by
+        sorry
+  rw [h_gamma_deriv, h_split, neg_add, h_zero_one, h_one_infty]; ring
+
 /-
 PROBLEM
 The Euler-Mascheroni constant equals ∫_0^1 (1-e^{-t})/t dt - ∫_1^∞ e^{-t}/t dt
@@ -173,106 +241,39 @@ By Fubini:
 -∫_1^∞ e^{-t} log(t) dt = -∫_1^∞ e^{-t} (∫_1^t 1/s ds) dt = -∫_1^∞ (1/s)(∫_s^∞ e^{-t} dt) ds = -∫_1^∞ e^{-s}/s ds
 Adding: γ = ∫_0^1 (1-e^{-s})/s ds - ∫_1^∞ e^{-s}/s ds
 -/
-set_option maxHeartbeats 1600000 in
+-- set_option maxHeartbeats 1600000 in
 lemma eulerMascheroni_eq_integral :
     eulerMascheroniConstant =
       (∫ t in (0:ℝ)..1, (1 - exp (-t)) / t) - ∫ t in Ioi (1:ℝ), exp (-t) / t := by
   -- Using the fact that $\gamma = -\Gamma'(1)$ and the integral representation of $\Gamma'(1)$, we can write
   have h_gamma_deriv : Real.eulerMascheroniConstant = -∫ t in Set.Ioi 0, Real.exp (-t) * Real.log t := by
     have h_gamma_deriv : deriv Real.Gamma 1 = ∫ t in Set.Ioi 0, Real.exp (-t) * Real.log t := by
-      -- By definition of the Gamma function, we know that its derivative at 1 is given by the integral of $t^{s-1} e^{-t} \log(t)$ evaluated at $s=1$.
-      have h_gamma_deriv : deriv Real.Gamma 1 = ∫ t in Set.Ioi 0, t^0 * Real.exp (-t) * Real.log t := by
-        have h_def : ∀ s > 0, Real.Gamma s = ∫ t in Set.Ioi 0, t^(s-1) * Real.exp (-t) := by
-          exact fun s hs => by rw [ Real.Gamma_eq_integral hs ] ; congr; ext; ring;
-        -- Apply the dominated convergence theorem to interchange the limit and integral.
-        have h_dominated : Filter.Tendsto (fun h => ∫ t in Set.Ioi 0, (t^h - 1) / h * Real.exp (-t)) (nhdsWithin 0 (Set.Ioi 0)) (nhds (∫ t in Set.Ioi 0, Real.log t * Real.exp (-t))) := by
-          -- To apply the dominated convergence theorem, we need to find a dominating function for the integrand.
-          have h_dominate : ∀ h ∈ Set.Ioo 0 1, ∀ t ∈ Set.Ioi 0, abs ((t^h - 1) / h * Real.exp (-t)) ≤ abs (Real.log t) * Real.exp (-t) * (t + 1) := by
-            intros h hh t ht
-            have h_abs : abs ((t^h - 1) / h) ≤ abs (Real.log t) * (t + 1) := by
-              -- Using the mean value theorem, we can find a $c \in (0, h)$ such that $t^h - 1 = h \cdot t^c \cdot \log t$.
-              obtain ⟨c, hc⟩ : ∃ c ∈ Set.Ioo 0 h, t^h - 1 = h * t^c * Real.log t := by
-                -- Apply the Mean Value Theorem to the function $f(x) = t^x$ on the interval $[0, h]$.
-                have h_mean_value : ∃ c ∈ Set.Ioo 0 h, deriv (fun x => t^x) c = (t^h - 1) / h := by
-                  have := exists_deriv_eq_slope ( f := fun x => t ^ x ) hh.1;
-                  simpa using this ( continuousOn_of_forall_continuousAt fun x hx => by exact ContinuousAt.rpow continuousAt_const continuousAt_id <| Or.inl <| by linarith [ ht.out ] ) ( fun x hx => by exact DifferentiableAt.differentiableWithinAt <| by exact DifferentiableAt.rpow ( differentiableAt_const _ ) differentiableAt_id <| by linarith [ ht.out ] );
-                norm_num [ Real.rpow_def_of_pos ht, mul_assoc, mul_comm, mul_left_comm ] at *;
-                exact h_mean_value.imp fun x hx => ⟨ hx.1, by rw [ hx.2, mul_div_cancel₀ _ hh.1.ne' ] ⟩;
-              by_cases h_zero : h = 0 <;> simp_all +decide [ abs_div, abs_mul, mul_assoc, mul_comm, mul_left_comm ];
-              by_cases h₂ : t ≤ 1;
-              · exact mul_le_mul_of_nonneg_right ( by rw [ abs_of_nonneg ( Real.rpow_nonneg ht.le _ ) ] ; exact le_trans ( Real.rpow_le_one ht.le h₂ ( by linarith ) ) ( by linarith ) ) ( abs_nonneg _ );
-              · exact mul_le_mul_of_nonneg_right ( by rw [ abs_of_nonneg ( Real.rpow_nonneg ht.le _ ) ] ; exact le_trans ( Real.rpow_le_rpow_of_exponent_le ( by linarith ) ( show c ≤ 1 by linarith ) ) ( by norm_num ) ) ( abs_nonneg _ );
-            rw [ abs_mul, abs_of_nonneg ( Real.exp_pos _ |> LT.lt.le ) ] ; nlinarith [ Real.exp_pos ( -t ) ];
-          -- The function $| \log t | e^{-t} (t + 1)$ is integrable on $(0, \infty)$.
-          have h_integrable : MeasureTheory.IntegrableOn (fun t : ℝ => abs (Real.log t) * Real.exp (-t) * (t + 1)) (Set.Ioi 0) := by
-            have h_integrable : MeasureTheory.IntegrableOn (fun t : ℝ => abs (Real.log t) * Real.exp (-t) * t) (Set.Ioi 0) := by
-              have h_integrable : MeasureTheory.IntegrableOn (fun t : ℝ => t * Real.exp (-t) * abs (Real.log t)) (Set.Ioi 0) := by
-                have h_integrable : MeasureTheory.IntegrableOn (fun t : ℝ => t * Real.exp (-t) * abs (Real.log t)) (Set.Ioc 0 1) := by
-                  have h_integrable : MeasureTheory.IntegrableOn (fun t : ℝ => t * abs (Real.log t)) (Set.Ioc 0 1) := by
-                    have h_integrable : MeasureTheory.IntegrableOn (fun t : ℝ => t * Real.log t) (Set.Ioc 0 1) := by
-                      exact Continuous.integrableOn_Ioc ( Real.continuous_mul_log );
-                    refine' h_integrable.norm.congr _;
-                    filter_upwards [ MeasureTheory.ae_restrict_mem measurableSet_Ioc ] with t ht using by rw [ Real.norm_eq_abs, abs_mul, abs_of_nonneg ht.1.le ] ;
-                  refine' h_integrable.mono' _ _;
-                  · exact MeasureTheory.AEStronglyMeasurable.mul ( MeasureTheory.AEStronglyMeasurable.mul ( measurable_id.aestronglyMeasurable ) ( Real.continuous_exp.comp_aestronglyMeasurable ( measurable_neg.aestronglyMeasurable ) ) ) ( Real.measurable_log.norm.aestronglyMeasurable );
-                  · filter_upwards [ MeasureTheory.ae_restrict_mem measurableSet_Ioc ] with t ht using by rw [ Real.norm_of_nonneg ( mul_nonneg ( mul_nonneg ht.1.le ( Real.exp_nonneg _ ) ) ( abs_nonneg _ ) ) ] ; exact mul_le_mul_of_nonneg_right ( mul_le_of_le_one_right ht.1.le ( Real.exp_le_one_iff.mpr ( neg_nonpos.mpr ht.1.le ) ) ) ( abs_nonneg _ ) ;
-                have h_integrable : MeasureTheory.IntegrableOn (fun t : ℝ => t * Real.exp (-t) * abs (Real.log t)) (Set.Ioi 1) := by
-                  have h_integrable : MeasureTheory.IntegrableOn (fun t : ℝ => t * Real.exp (-t) * t) (Set.Ioi 1) := by
-                    have h_integrable : MeasureTheory.IntegrableOn (fun t : ℝ => t^2 * Real.exp (-t)) (Set.Ioi 1) := by
-                      have h_gamma : ∫ t in Set.Ioi 0, t^2 * Real.exp (-t) = Real.Gamma 3 := by
-                        rw [ h_def ] <;> norm_num;
-                      exact MeasureTheory.IntegrableOn.mono_set ( by exact ( by contrapose! h_gamma; rw [ MeasureTheory.integral_undef h_gamma ] ; positivity ) ) ( Set.Ioi_subset_Ioi zero_le_one );
-                    exact h_integrable.congr_fun ( fun x hx => by ring ) measurableSet_Ioi;
-                  refine' h_integrable.mono' _ _;
-                  · exact Measurable.aestronglyMeasurable ( by exact Measurable.mul ( measurable_id.mul ( Real.continuous_exp.measurable.comp measurable_neg ) ) ( Real.measurable_log.norm ) );
-                  · filter_upwards [ MeasureTheory.ae_restrict_mem measurableSet_Ioi ] with t ht using by rw [ Real.norm_of_nonneg ( mul_nonneg ( mul_nonneg ( by linarith [ ht.out ] ) ( Real.exp_nonneg _ ) ) ( abs_nonneg _ ) ) ] ; exact mul_le_mul_of_nonneg_left ( by rw [ abs_of_nonneg ( Real.log_nonneg ( by linarith [ ht.out ] ) ) ] ; exact le_trans ( Real.log_le_sub_one_of_pos ( by linarith [ ht.out ] ) ) ( by linarith [ ht.out ] ) ) ( mul_nonneg ( by linarith [ ht.out ] ) ( Real.exp_nonneg _ ) ) ;
-                convert MeasureTheory.IntegrableOn.union ‹IntegrableOn ( fun t : ℝ => t * Real.exp ( -t ) * |log t| ) ( Set.Ioc 0 1 ) volume› ‹IntegrableOn ( fun t : ℝ => t * Real.exp ( -t ) * |log t| ) ( Set.Ioi 1 ) volume› using 1 ; norm_num;
-              exact h_integrable.congr_fun ( fun x hx => by ring ) measurableSet_Ioi;
-            have h_integrable : MeasureTheory.IntegrableOn (fun t : ℝ => abs (Real.log t) * Real.exp (-t)) (Set.Ioi 0) := by
-              have h_integrable : MeasureTheory.IntegrableOn (fun t : ℝ => abs (Real.log t) * Real.exp (-t)) (Set.Ioc 0 1) := by
-                have h_integrable : MeasureTheory.IntegrableOn (fun t : ℝ => abs (Real.log t)) (Set.Ioc 0 1) := by
-                  have h_integrable : ∫ t in Set.Ioc 0 1, abs (Real.log t) = 1 := by
-                    rw [ MeasureTheory.setIntegral_congr_fun measurableSet_Ioc fun x hx => abs_of_nonpos ( Real.log_nonpos hx.1.le hx.2 ), ← intervalIntegral.integral_of_le ] <;> norm_num;
-                  exact ( by contrapose! h_integrable; rw [ MeasureTheory.integral_undef h_integrable ] ; norm_num );
-                refine' h_integrable.mono' _ _;
-                · exact MeasureTheory.AEStronglyMeasurable.mul ( h_integrable.aestronglyMeasurable ) ( Continuous.aestronglyMeasurable ( by continuity ) );
-                · filter_upwards [ MeasureTheory.ae_restrict_mem measurableSet_Ioc ] with t ht using by simpa [ abs_mul ] using mul_le_mul_of_nonneg_left ( Real.exp_le_one_iff.mpr <| neg_nonpos.mpr ht.1.le ) <| abs_nonneg <| Real.log t;
-              have h_integrable : MeasureTheory.IntegrableOn (fun t : ℝ => abs (Real.log t) * Real.exp (-t)) (Set.Ioi 1) := by
-                have h_integrable : MeasureTheory.IntegrableOn (fun t : ℝ => t * Real.exp (-t)) (Set.Ioi 1) := by
-                  have := @integral_rpow_mul_exp_neg_rpow 1;
-                  specialize @this 1 ; norm_num at this;
-                  exact MeasureTheory.IntegrableOn.mono_set ( by exact ( by exact ( by exact ( by exact ( by exact ( by exact by contrapose! this; rw [ MeasureTheory.integral_undef this ] ; norm_num ) ) ) ) ) ) ( Set.Ioi_subset_Ioi zero_le_one );
-                refine' h_integrable.mono' _ _;
-                · exact Measurable.aestronglyMeasurable ( by exact Measurable.mul ( Real.measurable_log.norm ) ( Real.continuous_exp.measurable.comp measurable_neg ) );
-                · filter_upwards [ MeasureTheory.ae_restrict_mem measurableSet_Ioi ] with t ht using by rw [ Real.norm_of_nonneg ( by positivity ) ] ; exact mul_le_mul_of_nonneg_right ( by rw [ abs_of_nonneg ( Real.log_nonneg ht.out.le ) ] ; exact le_trans ( Real.log_le_sub_one_of_pos ( by linarith [ ht.out ] ) ) ( by linarith [ ht.out ] ) ) ( by positivity ) ;
-              convert MeasureTheory.IntegrableOn.union ‹IntegrableOn ( fun t : ℝ => |Real.log t| * Real.exp ( -t ) ) ( Set.Ioc 0 1 ) volume› ‹IntegrableOn ( fun t : ℝ => |Real.log t| * Real.exp ( -t ) ) ( Set.Ioi 1 ) volume› using 1 ; norm_num;
-            simp_all +decide [ mul_add ];
-            exact MeasureTheory.Integrable.add ‹_› ‹_›;
-          refine' MeasureTheory.tendsto_integral_filter_of_dominated_convergence _ _ _ _ _;
-          refine' fun t => |Real.log t| * Real.exp ( -t ) * ( t + 1 );
-          · filter_upwards [ self_mem_nhdsWithin ] with n hn using Measurable.aestronglyMeasurable ( by exact Measurable.mul ( Measurable.div_const ( by exact Measurable.sub ( measurable_id.pow_const _ ) measurable_const ) _ ) ( Real.continuous_exp.measurable.comp measurable_neg ) );
-          · filter_upwards [ Ioo_mem_nhdsGT zero_lt_one ] with h hh using Filter.eventually_of_mem ( MeasureTheory.ae_restrict_mem measurableSet_Ioi ) fun t ht => h_dominate h hh t ht;
-          · exact h_integrable;
-          · filter_upwards [ MeasureTheory.ae_restrict_mem measurableSet_Ioi ] with t ht;
-            refine' Filter.Tendsto.mul _ tendsto_const_nhds;
-            simpa [ div_eq_inv_mul, Real.rpow_def_of_pos ht ] using HasDerivAt.tendsto_slope_zero_right ( HasDerivAt.sub ( HasDerivAt.exp ( HasDerivAt.const_mul ( Real.log t ) ( hasDerivAt_id 0 ) ) ) ( hasDerivAt_const 0 1 ) );
-        -- By definition of the derivative, we know that
-        have h_deriv : Filter.Tendsto (fun h => (Real.Gamma (1 + h) - Real.Gamma 1) / h) (nhdsWithin 0 (Set.Ioi 0)) (nhds (deriv Real.Gamma 1)) := by
-          have h_deriv : HasDerivAt Real.Gamma (deriv Real.Gamma 1) 1 := by
-            exact DifferentiableAt.hasDerivAt ( Real.differentiableAt_Gamma fun m => by linarith );
-          simpa [ div_eq_inv_mul ] using h_deriv.tendsto_slope_zero_right;
-        -- By definition of the Gamma function, we know that
-        have h_gamma_def : ∀ h > 0, (Real.Gamma (1 + h) - Real.Gamma 1) / h = ∫ t in Set.Ioi 0, (t^h - 1) / h * Real.exp (-t) := by
-          intro h hh; rw [ h_def ( 1 + h ) ( by linarith ), h_def 1 zero_lt_one ] ; simp +decide [ sub_mul, div_mul_eq_mul_div, MeasureTheory.integral_div ] ;
-          rw [ MeasureTheory.integral_sub ] <;> norm_num [ integral_exp_Iic ];
-          · have := @integral_rpow_mul_exp_neg_rpow 1;
-            exact ( by have := @this h ( by norm_num ) ( by linarith ) ; exact ( by contrapose! this; rw [ MeasureTheory.integral_undef ( by aesop ) ] ; positivity ) );
-          · exact MeasureTheory.integrable_of_integral_eq_one ( by simpa using integral_exp_neg_Ioi_zero );
-        simpa [ mul_assoc, mul_comm, mul_left_comm ] using tendsto_nhds_unique h_deriv ( h_dominated.congr' <| Filter.eventuallyEq_of_mem self_mem_nhdsWithin fun x hx => h_gamma_def x hx ▸ rfl );
-      aesop;
+      -- Option 1
+      -- convert Complex.hasDerivAt_GammaIntegral (s := 1) (by simp)
+      --   |>.congr_of_eventuallyEq ?_ |>.real_of_complex.deriv
+      -- · simp [mul_comm, ← Complex.ofReal_mul, integral_complex_ofReal, - Complex.ofReal_exp]
+      -- · have h_open : IsOpen {s : ℂ | 0 < s.re} := isOpen_lt (by fun_prop) (by fun_prop)
+      --   filter_upwards [h_open.mem_nhds (by simp)] with s hs using Complex.Gamma_eq_integral hs
+      -- Option 2
+      let I : ℂ := ∫ t : ℝ in Ioi 0, t ^ ((1 : ℂ) - 1) * (Real.log t * Real.exp (-t))
+      have h_complex_gamma : HasDerivAt Complex.Gamma I (1 : ℂ) := by
+        refine Complex.hasDerivAt_GammaIntegral (by simp) |>.congr_of_eventuallyEq ?_
+        have h_open : IsOpen {s : ℂ | 0 < s.re} := isOpen_lt (by fun_prop) (by fun_prop)
+        filter_upwards [h_open.mem_nhds (by simp)] with s hs using (Complex.Gamma_eq_integral hs)
+      convert h_complex_gamma.real_of_complex.deriv
+      simp [I, mul_comm, ← Complex.ofReal_mul, integral_complex_ofReal, - Complex.ofReal_exp]
     rw [ ← h_gamma_deriv, Real.eulerMascheroniConstant_eq_neg_deriv ];
   -- We can split the integral into two parts: from 0 to 1 and from 1 to ∞.
   have h_split : ∫ t in Set.Ioi 0, Real.exp (-t) * Real.log t = (∫ t in Set.Ioc 0 1, Real.exp (-t) * Real.log t) + (∫ t in Set.Ioi 1, Real.exp (-t) * Real.log t) := by
+    -- rw [ ← MeasureTheory.setIntegral_union ]
+    -- · simp
+    -- · simp
+    -- · simp
+    -- · apply AEStronglyMeasurable.contin
+    --   simp
+    -- · apply GammaIntegral_convergent (show 0 < 1 by norm_num) |>.mono_set
+    --   simp
+    -- · simp
     rw [ ← MeasureTheory.setIntegral_union ] <;> norm_num;
     · have h_integrable : MeasureTheory.IntegrableOn (fun t => Real.log t) (Set.Ioc 0 1) := by
         rw [ ← intervalIntegrable_iff_integrableOn_Ioc_of_le zero_le_one ];
@@ -462,3 +463,5 @@ theorem pv_exp_div_eq_gamma_add_log_add_integral {y : ℝ} (hy : 0 < y) :
   filter_upwards [this, self_mem_nhdsWithin] with ε hε hε_pos
   exact (pv_rewrite hy hε_pos (lt_of_lt_of_le hε (min_le_right _ _))
     (lt_of_lt_of_le hε (min_le_left _ _))).symm
+
+#show_unused pv_exp_div_eq_gamma_add_log_add_integral

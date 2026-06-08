@@ -106,7 +106,6 @@ lemma first_fourier_aux2 (hx : 0 < x) (n : ℕ) :
       ring
     _ = _ := by simp ; group
 
-set_option backward.isDefEq.respectTransparency false in
 @[blueprint "first-fourier"
   (title := "first-fourier")
   (statement := /--
@@ -453,7 +452,6 @@ lemma decay_bounds_cor (ψ : W21) :
     ∃ C : ℝ, ∀ u, ‖𝓕 (ψ : ℝ → ℂ) u‖ ≤ C / (1 + u ^ 2) := by
   simpa only [div_eq_mul_inv] using ⟨_, decay_bounds_key ψ⟩
 
-set_option backward.isDefEq.respectTransparency false in
 @[continuity, fun_prop] lemma continuous_FourierIntegral (ψ : W21) : Continuous (𝓕 (ψ : ℝ → ℂ)) :=
   VectorFourier.fourierIntegral_continuous continuous_fourierChar
     (by simp only [innerₗ_apply_apply, RCLike.inner_apply', conj_trivial, continuous_mul])
@@ -489,7 +487,6 @@ lemma continuous_LSeries_aux (hf : Summable (nterm f σ')) :
   exact continuous_tsum l1 hf (fun n x => le_of_eq (l2 n x))
 
 -- Here compact support is used but perhaps it is not necessary
-set_option backward.isDefEq.respectTransparency false in
 lemma limiting_fourier_aux (hG' : Set.EqOn G (fun s ↦ LSeries f s - A / (s - 1)) {s | 1 < s.re})
     (hf : ∀ (σ' : ℝ), 1 < σ' → Summable (nterm f σ')) (ψ : CS 2 ℂ) (hx : 1 ≤ x) (σ' : ℝ)
     (hσ' : 1 < σ') :
@@ -1142,7 +1139,6 @@ lemma limiting_fourier (hcheby : cheby f)
 
 
 
-set_option backward.isDefEq.respectTransparency false in
 lemma limiting_cor_aux {f : ℝ → ℂ} : Tendsto (fun x : ℝ ↦ ∫ t, f t * x ^ (t * I)) atTop (𝓝 0) := by
 
   have l1 : ∀ᶠ x : ℝ in atTop, ∀ t : ℝ, x ^ (t * I) = exp (log x * t * I) := by
@@ -1715,7 +1711,6 @@ lemma bound_main {C : ℝ} (A : ℂ) (x : ℝ) (hx : 1 ≤ x) (ψ : W21)
   convert _root_.add_le_add l1 l2 using 1 ; ring
 
 
-set_option backward.isDefEq.respectTransparency false in
 lemma limiting_cor_W21 (ψ : W21) (hf : ∀ (σ' : ℝ), 1 < σ' → Summable (nterm f σ'))
     (hcheby : cheby f) (hG : ContinuousOn G {s | 1 ≤ s.re})
     (hG' : Set.EqOn G (fun s ↦ LSeries f s - A / (s - 1)) {s | 1 < s.re}) :
@@ -1879,7 +1874,6 @@ theorem comp_exp_support {Ψ : ℝ → ℂ} (hsupp : HasCompactSupport Ψ)
     cocompact_eq_atBot_atTop]
   exact ⟨comp_exp_support1 hplus, comp_exp_support2 hsupp⟩
 
-set_option backward.isDefEq.respectTransparency false in
 lemma wiener_ikehara_smooth_aux (l0 : Continuous Ψ) (hsupp : HasCompactSupport Ψ)
     (hplus : closure (Function.support Ψ) ⊆ Ioi 0) (x : ℝ) (hx : 0 < x) :
     ∫ (u : ℝ) in Ioi (-Real.log x), ↑(rexp u) * Ψ (rexp u) = ∫ (y : ℝ) in Ioi (1 / x), Ψ y := by
@@ -2362,13 +2356,12 @@ lemma tendsto_mul_ceil_div :
 noncomputable def S (f : ℕ → 𝕜) (ε : ℝ) (N : ℕ) : 𝕜 := (∑ n ∈ Finset.Ico ⌈ε * N⌉₊ N, f n) / N
 
 lemma S_sub_S {f : ℕ → 𝕜} {ε : ℝ} {N : ℕ} (hε : ε ≤ 1) : S f 0 N - S f ε N = cumsum f ⌈ε * N⌉₊ / N := by
-  have hceilN : ⌈ε * N⌉₊ ≤ N := by
+  have r1 : Finset.range N = Finset.range ⌈ε * N⌉₊ ∪ Finset.Ico ⌈ε * N⌉₊ N := by
+    rw [Finset.range_eq_Ico, Finset.range_eq_Ico]
+    symm
+    apply Finset.Ico_union_Ico_eq_Ico (by simp)
     simp only [Nat.ceil_le]
     exact mul_le_of_le_one_left N.cast_nonneg hε
-  have r1 : Finset.range N = Finset.range ⌈ε * N⌉₊ ∪ Finset.Ico ⌈ε * N⌉₊ N := by
-    ext n
-    simp only [Finset.mem_range, Finset.mem_union, Finset.mem_Ico]
-    omega
   have r2 : Disjoint (Finset.range ⌈ε * N⌉₊) (Finset.Ico ⌈ε * N⌉₊ N) := by
     rw [Finset.range_eq_Ico] ; apply Finset.Ico_disjoint_Ico_consecutive
   simp [S, r1, Finset.sum_union r2, cumsum, add_div]
@@ -2471,7 +2464,6 @@ lemma norm_x_cpow_it (x t : ℝ) (hx : 0 < x) : ‖(x : ℂ) ^ (t * I)‖ = 1 :=
   convert norm_exp_ofReal_mul_I (t * x.log) using 2
   push_cast; ring_nf
 
-set_option backward.isDefEq.respectTransparency false in
 lemma limiting_fourier_aux_gt_zero (hG' : Set.EqOn G (fun s ↦ LSeries f s - A / (s - 1)) {s | 1 < s.re})
     (hf : ∀ (σ' : ℝ), 1 < σ' → Summable (nterm f σ')) (ψ : CS 2 ℂ) (hx : 0 < x) (σ' : ℝ) (hσ' : 1 < σ') :
     ∑' n, term f σ' n * 𝓕 (ψ : ℝ → ℂ) (1 / (2 * π) * log (n / x)) -
@@ -3531,7 +3523,6 @@ lemma crude_upper_bound
             add_le_add hRHS_bound hA_bound
   exact hbound
 
-set_option backward.isDefEq.respectTransparency false in
 lemma Real.fourierIntegral_convolution {f g : ℝ → ℂ} (hf : Integrable f) (hg : Integrable g) :
     𝓕 (convolution f g (ContinuousLinearMap.mul ℂ ℂ) volume) = 𝓕 f * 𝓕 g := by
   ext y

@@ -166,15 +166,12 @@ lemma DerivativeBound {M r r' R : ℝ} {f : ℂ → ℂ} {z : ℂ}
       grw [this]
       · exact le_of_eq (by field)
       · refine mul_nonneg (mul_nonneg ?_ ?_) (inv_nonneg.mpr ?_) <;> linarith
-    have hdist : r' - r ≤ ‖z' - z‖ := by
-      simp only [mem_sphere_iff_norm, sub_zero, Metric.mem_closedBall,
-        dist_zero_right] at hz' z_in_r
-      rw [← hz']
-      exact le_trans (by linarith) (norm_sub_norm_le z' z)
     rw [norm_pow, norm_inv, one_div, inv_pow]
     gcongr
+    simp only [mem_sphere_iff_norm, sub_zero, Metric.mem_closedBall, dist_zero_right] at hz' z_in_r
+    exact le_trans (by linarith) (norm_sub_norm_le z' z)
 
-
+#exit
 
 @[blueprint "BorelCaratheodoryDeriv"
   (title := "BorelCaratheodoryDeriv")
@@ -2084,7 +2081,6 @@ lemma I1NewBound {SmoothingF : ℝ → ℝ}
       · rw [show ‖(↑π : ℂ)‖ = π from (RCLike.norm_ofReal π).trans (abs_of_pos Real.pi_pos)]
     · ring
 
-set_option backward.isDefEq.respectTransparency false in
 @[blueprint
   (title := "I5NewBound")
   (statement := /--

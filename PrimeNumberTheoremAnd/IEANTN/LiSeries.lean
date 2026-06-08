@@ -145,6 +145,24 @@ theorem integral_exp_sub_one_div_eq_tsum (y : ℝ) :
 /-- `γ = -Γ'(1) = -∫₀^∞ log(t) exp(-t) dt`. -/
 theorem eulerMascheroni_eq_neg_integral :
     eulerMascheroniConstant = -(∫ t in Ioi (0 : ℝ), log t * exp (-t)) := by
+  -- TODO: a bunch of stuff here is duplicated in PVIdentity
+  -- have h_gamma_deriv : deriv Real.Gamma 1 = ∫ t in Set.Ioi 0, Real.log t * Real.exp (-t) := by
+  --   -- Option 1
+  --   -- convert Complex.hasDerivAt_GammaIntegral (s := 1) (by simp)
+  --   --   |>.congr_of_eventuallyEq ?_ |>.real_of_complex.deriv
+  --   -- · simp [← Complex.ofReal_mul, integral_complex_ofReal, - Complex.ofReal_exp]
+  --   -- · have h_open : IsOpen {s : ℂ | 0 < s.re} := isOpen_lt (by fun_prop) (by fun_prop)
+  --   --   filter_upwards [h_open.mem_nhds (by simp)] with s hs using Complex.Gamma_eq_integral hs
+  --   -- Option 2
+  --   let I : ℂ := ∫ t : ℝ in Ioi 0, t ^ ((1 : ℂ) - 1) * (Real.log t * Real.exp (-t))
+  --   have h_complex_gamma : HasDerivAt Complex.Gamma I (1 : ℂ) := by
+  --     refine Complex.hasDerivAt_GammaIntegral (by simp) |>.congr_of_eventuallyEq ?_
+  --     have h_open : IsOpen {s : ℂ | 0 < s.re} := isOpen_lt (by fun_prop) (by fun_prop)
+  --     filter_upwards [h_open.mem_nhds (by simp)] with s hs using (Complex.Gamma_eq_integral hs)
+  --   convert h_complex_gamma.real_of_complex.deriv
+  --   simp [I, ← Complex.ofReal_mul, integral_complex_ofReal, - Complex.ofReal_exp]
+  -- rw [ ← h_gamma_deriv, Real.eulerMascheroniConstant_eq_neg_deriv ];
+
   -- Step 1: Get the complex derivative of GammaIntegral at s = 1
   have hpos : (0 : ℝ) < (1 : ℂ).re := by simp
   have hderiv_integral := Complex.hasDerivAt_GammaIntegral hpos

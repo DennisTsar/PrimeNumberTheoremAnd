@@ -749,7 +749,6 @@ lemma ZetaSum_aux1derivφCont {s : ℂ} (s_ne_zero : s ≠ 0) {a b : ℕ} (ha : 
   refine continuous_ofReal.continuousOn.cpow_const ?_ |>.const_smul (c := -s) |>.congr this
   exact fun x hx ↦ ofReal_mem_slitPlane.mpr <| xpos_of_uIcc ha hx
 
-set_option backward.isDefEq.respectTransparency false in
 @[blueprint
   (title := "ZetaSum-aux1")
   (statement := /--
@@ -2602,7 +2601,6 @@ lemma ZetaInvBound2 :
       abs_eq_self.mpr (by positivity), abs_eq_self.mpr (by apply Real.rpow_nonneg (Real.log_nonneg (by linarith)))]
     ring_nf
 
-set_option backward.isDefEq.respectTransparency false in
 lemma deriv_fun_re {t : ℝ} {f : ℂ → ℂ} (diff : ∀ (σ : ℝ), DifferentiableAt ℂ f (↑σ + ↑t * I)) :
     (deriv fun {σ₂ : ℝ} ↦ f (σ₂ + t * I)) = fun (σ : ℝ) ↦ deriv f (σ + t * I) := by
   ext σ
@@ -2611,7 +2609,6 @@ lemma deriv_fun_re {t : ℝ} {f : ℂ → ℂ} (diff : ∀ (σ : ℝ), Different
     exact this
   · apply DifferentiableAt.add_const _ <| differentiableAt_ofReal σ
 
-set_option backward.isDefEq.respectTransparency false in
 @[blueprint
   (title := "Zeta-eq-int-derivZeta")
   (statement := /--

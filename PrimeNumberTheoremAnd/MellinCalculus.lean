@@ -353,7 +353,6 @@ lemma support_MellinConvolution (f g : ℝ → 𝕂) :
 blueprint_comment /--
 The Mellin transform of a convolution is the product of the Mellin transforms.
 -/
-set_option backward.isDefEq.respectTransparency false in
 @[blueprint
   (title := "MellinConvolutionTransform")
   (statement := /--
@@ -438,7 +437,6 @@ lemma mem_within_strip (σ₁ σ₂ : ℝ) :
       𝓟 {s | σ₁ ≤ s.re ∧ s.re ≤ σ₂} :=
   mem_principal_self _
 
-set_option backward.isDefEq.respectTransparency false in
 lemma MellinOfPsi_aux {ν : ℝ → ℝ} (diffν : ContDiff ℝ 1 ν)
     (suppν : ν.support ⊆ Set.Icc (1 / 2) 2)
     {s : ℂ} (hs : s ≠ 0) :
@@ -659,7 +657,6 @@ lemma DeltaSpikeOfRealContinuous {ν : ℝ → ℝ} {ε : ℝ} (εpos : 0 < ε)
 blueprint_comment /--
 The Mellin transform of the delta spike is easy to compute.
 -/
-set_option backward.isDefEq.respectTransparency false in
 @[blueprint
   (title := "MellinOfDeltaSpike")
   (statement := /--

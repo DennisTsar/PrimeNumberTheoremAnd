@@ -12,7 +12,7 @@ import PrimeNumberTheoremAnd.IEANTN.LogTables
 -- import PrimeNumberTheoremAnd.Consequences
 -- import Mathlib.Tactic.NormNum.NatFactorial
 -- import Batteries.Tactic.ShowUnused
-
+--
 -- set_option linter.unusedVariables.analyzeTactics true
 
 blueprint_comment /--
@@ -1675,6 +1675,7 @@ private lemma bklnw_a2_30_le : BKLNW.a₂ 30 ≤ 42.42 := by
     mul_le_mul_of_nonneg_right hfac (by norm_num)
   linarith
 
+-- #check Nat.ratSqrt
 -- Helper bounding the main asymptotic coefficient.
 private lemma coeff_bound_30 :
     (1 / (121.096 : ℝ)) * (5.5666305 / 30) ^ (3 / 2 : ℝ) * Real.exp (2 * Real.sqrt (30 / 5.5666305)) ≤ 0.06865 := by
@@ -1688,18 +1689,13 @@ private lemma coeff_bound_30 :
     simp [Real.sqrt_eq_rpow]
   have hsqrt_r : Real.sqrt r ≤ (43077 / 100000 : ℝ) := by
     refine (Real.sqrt_le_iff).2 ?_
-    constructor
-    · norm_num
-    · dsimp [r]
-      norm_num
+    norm_num
   have hrpow_bound : r ^ (3 / 2 : ℝ) ≤ r * (43077 / 100000 : ℝ) := by
     rw [hrpow]
     gcongr
   have hsqrt_u : Real.sqrt (30 / 5.5666305) ≤ (23215 / 10000 : ℝ) := by
     refine (Real.sqrt_le_iff).2 ?_
-    constructor
-    · norm_num
-    · norm_num
+    norm_num
   have hexp104 : Real.exp (2 * Real.sqrt (30 / 5.5666305)) ≤ 104 := by
     have hpow : 2 * Real.sqrt (30 / 5.5666305) ≤ (4.643 : ℝ) := by
       nlinarith [hsqrt_u]
@@ -1716,13 +1712,7 @@ private lemma coeff_bound_30 :
   have hcoef_step :
       (1 / (121.096 : ℝ)) * r ^ (3 / 2 : ℝ) * Real.exp (2 * Real.sqrt (30 / 5.5666305))
       ≤ (1 / (121.096 : ℝ)) * (r * (43077 / 100000 : ℝ)) * 104 := by
-    have hnonneg : 0 ≤ (1 / (121.096 : ℝ)) := by positivity
-    have hmul1 : (1 / (121.096 : ℝ)) * r ^ (3 / 2 : ℝ) ≤ (1 / (121.096 : ℝ)) * (r * (43077 / 100000 : ℝ)) :=
-      mul_le_mul_of_nonneg_left hrpow_bound hnonneg
-    have hmul2 : (1 / (121.096 : ℝ)) * r ^ (3 / 2 : ℝ) * Real.exp (2 * Real.sqrt (30 / 5.5666305))
-        ≤ ((1 / (121.096 : ℝ)) * (r * (43077 / 100000 : ℝ))) * 104 :=
-      mul_le_mul hmul1 hexp104 (by positivity) (by positivity)
-    simpa [mul_assoc, mul_left_comm, mul_comm] using hmul2
+    grw [hrpow_bound, hexp104]
   have hnum : (1 / (121.096 : ℝ)) * (r * (43077 / 100000 : ℝ)) * 104 ≤ (0.06865 : ℝ) := by
     dsimp [r]
     norm_num
@@ -2824,12 +2814,13 @@ theorem proposition_17 {x x₀ : ℝ} (hx : x > x₀) (hx₀ : x₀ > 2) (εψ :
               log_mul (by linarith) (ne_of_gt (rpow_pos_of_pos (by linarith) _)), log_rpow (by linarith)]
           ring_nf
           nlinarith [log_lt_log (by linarith) hx]
-        exact ⟨by convert hpower_bound (1 / 2) (by norm_num) (by norm_num) using 1; ring_nf,
-          by convert hpower_bound (1 / 3) (by norm_num) (by norm_num) using 1; ring_nf,
-          by convert hpower_bound (1 / 5) (by norm_num) (by norm_num) using 1; ring_nf,
-          by convert hpower_bound (1 / 4) (by norm_num) (by norm_num) using 1; ring_nf,
-          by convert hpower_bound (1 / 6) (by norm_num) (by norm_num) using 1; ring_nf,
-          by convert hpower_bound (1 / 10) (by norm_num) (by norm_num) using 1; ring_nf⟩
+        grind
+        -- exact ⟨by convert hpower_bound (1 / 2) (by norm_num) (by norm_num) using 1; ring_nf,
+        --   by convert hpower_bound (1 / 3) (by norm_num) (by norm_num) using 1; ring_nf,
+        --   by convert hpower_bound (1 / 5) (by norm_num) (by norm_num) using 1; ring_nf,
+        --   by convert hpower_bound (1 / 4) (by norm_num) (by norm_num) using 1; ring_nf,
+        --   by convert hpower_bound (1 / 6) (by norm_num) (by norm_num) using 1; ring_nf,
+        --   by convert hpower_bound (1 / 10) (by norm_num) (by norm_num) using 1; ring_nf⟩
       linarith [rpow_pos_of_pos hx_pos (1 / 2 : ℝ),
         rpow_pos_of_pos hx_pos (1 / 3 : ℝ), rpow_pos_of_pos hx_pos (1 / 5 : ℝ),
         rpow_pos_of_pos hx_pos (1 / 4 : ℝ), rpow_pos_of_pos hx_pos (1 / 6 : ℝ),
@@ -2842,6 +2833,17 @@ theorem proposition_17 {x x₀ : ℝ} (hx : x > x₀) (hx₀ : x₀ > 2) (εψ :
       · exact theta_le_psi x
     exact h_le_psi.trans <| hEψ.trans' (div_le_div_of_nonneg_right (le_abs_self _) (by linarith))
   · exact le_add_of_le_of_nonneg (le_add_of_nonneg_right <| by positivity) <| by positivity
+
+
+
+#print axioms CostaPereira.theorem_1a
+#print axioms psi_le_bound
+#print axioms psi_le_bound_small
+#print axioms psi_le_bound_medium
+#print axioms psi_le_bound_large
+#print axioms RS_prime.theorem_12
+#print axioms theta_le_psi
+#print axioms proposition_17
 
 blueprint_comment /--
 \subsection{From numerical estimates on theta to numerical estimates on pi}
@@ -2864,6 +2866,7 @@ theorem Li_identity' {a b : ℝ} (ha : 2 ≤ a) (hb : a ≤ b) :
     (a / log a - 2 / log 2 + (∫ t in 2..a, 1 / (log t ^ 2)) - a / log a) := by ring
   _ = _ := by rw [Li_identity ha, Li_identity (ha.trans hb)]; ring
 
+-- TODO: superseded by bound_x0_x1
 @[blueprint
   "fks2-lemma-19"
   (title := "FKS2 Lemma 19")
@@ -2886,7 +2889,7 @@ theorem Li_identity' {a b : ℝ} (ha : 2 ≤ a) (hb : a ≤ b) :
     = \Li(b) - \frac{b}{\log b} - (\Li(a) - \frac{a}{\log a}). $$ -/)
   (latexEnv := "lemma")
   (discussion := 712)]
-theorem lemma_19 {x₀ x₁ : ℝ} (hx₁ : x₀ < x₁) (hx₀ : x₀ ≥ 2)
+theorem lemma_19 {x₀ x₁ : ℝ} (hx₁ : x₀ ≤ x₁) (hx₀ : x₀ ≥ 2)
   {N : ℕ} (b : ℕ → ℝ) (hmono : Monotone b)
   (h_b_start : b 0 = log x₀) (hN : 0 ≤ N)
   (h_b_end : b N = log x₁)
@@ -2908,10 +2911,10 @@ theorem lemma_19 {x₀ x₁ : ℝ} (hx₁ : x₀ < x₁) (hx₀ : x₀ ≥ 2)
     simp [abs_div, div_div, abs_of_nonneg (by grind : 0 ≤ t)]
   calc
   _ ≤ ∫ t in x₀..x₁, |(θ t - t) / (t * log t ^ 2)| :=
-    intervalIntegral.abs_integral_le_integral_abs hx₁.le
+    intervalIntegral.abs_integral_le_integral_abs hx₁
   _ = ∫ t in x₀..x₁, |θ t - t| / t / log t ^ 2 := by
     refine intervalIntegral.integral_congr fun t ht => ?_
-    rw [Set.uIcc_of_le hx₁.le] at ht
+    rw [Set.uIcc_of_le hx₁] at ht
     simp [abs_div, div_div, abs_of_nonneg (by grind : 0 ≤ t)]
   _ = ∑ i ∈ Finset.Ico 0 N, ∫ (t : ℝ) in (exp (b i))..exp (b (i + 1)),
     |θ t - t| / t / log t ^ 2 := by
@@ -2991,7 +2994,7 @@ lemma hasDerivAt_Liop2 {x : ℝ} (hx : x ∈ Set.Ici 6.58) : HasDerivAt Li (1 / 
   have := hasDerivAt_Liop (by rw [Set.mem_Ioi]; linarith [Set.mem_Ici.mp hx])
   exact HasDerivAt.congr_deriv this rfl
 
-lemma yoyo  {x : ℝ} (hx : x ≠ 0) (hlog : log x ≠ 0) :
+lemma yoyo {x : ℝ} (hx : x ≠ 0) (hlog : log x ≠ 0) :
     HasDerivAt (fun x : ℝ ↦ x / log x) (-(1 - log x) / log x ^ 2) x := by
   have := ((hasDerivAt_id x).div (Real.hasDerivAt_log hx) hlog)
   simpa [neg_sub, hx, div_eq_mul_inv, one_div, pow_two, sub_eq_add_neg] using
@@ -3156,12 +3159,6 @@ theorem lemma_20_b {x : ℝ} (hx : x > 6.58) :
   constructor
   · have : 0 < x - 6.58 := sub_pos.mpr hx
     grw [gt_iff_lt, div_eq_inv_mul, ← lt_div_iff₀ this, ← sub_lt_self (Li x - x / log x) hpos]
-
-    -- have := @StrictMonoOn.strictConvexOn_of_deriv
-    -- have := @StrictMonoOn.exists_deriv_lt_slope
-    -- have := StrictConcaveOn.secant_strict_mono
-
-    -- ⊢ log x / x * (Li x - x / log x - (Li x₁ - x₁ / log x₁)) ≤ log x₂ / x₂ * (Li x₂ - x₂ / log x₂ - Li x₁ + x₁ / log x₁)
     obtain ⟨c, hc⟩ := exists_hasDerivAt_eq_slope _ _ hx
       (HasDerivAt.continuousOn (fun x hx => hasDerivAt_Liop23 (by simp_all)))
       (fun c hc => (hasDerivAt_Liop23' (x := c) (by grind)))
@@ -3202,6 +3199,7 @@ private lemma Eθ_bound_integral_last {x₁ x : ℝ} (hx₁ : 2 ≤ x₁) (hx : 
   · intro t ht; rw [mul_one_div]; gcongr
     exact h_εθ_num_last t ht.1
 
+-- TODO: this should be lemma 19
 -- Bound on the partition sum from x₀ to x₁
 private lemma bound_x0_x1 {x₀ x₁ : ℝ} (hx₀ : x₀ ≥ 2) (hx₀_le_x₁ : x₀ ≤ x₁)
     {N : ℕ} (b : Fin (N + 1) → ℝ) (hmono : Monotone b)
@@ -3226,7 +3224,7 @@ private lemma bound_x0_x1 {x₀ x₁ : ℝ} (hx₀ : x₀ ≥ 2) (hx₀_le_x₁ 
   have h_ind : ∀ n : Fin (N + 1), ∫ t in (exp (b 0))..(exp (b n)), Eθ t / (log t) ^ 2 = ∑ i ∈ Finset.Iio n, ∫ t in (exp (b i))..(exp (b (i + 1))), Eθ t / (log t) ^ 2 := by
     intro n
     induction n using Fin.induction with
-    | zero => simp [show (Finset.Iio 0 : Finset (Fin (N + 1))) = ∅ by ext i; simp]
+    | zero => simp [bot_eq_zero]
     | succ n ih =>
       have h_RHS : Set.uIcc (exp (b 0)) (exp (b (Fin.last N))) = Set.Icc (exp (b 0)) (exp (b (Fin.last N))) :=
         Set.uIcc_of_le (exp_le_exp.mpr (hmono (Fin.le_last _)))
@@ -3246,14 +3244,8 @@ private lemma bound_x0_x1 {x₀ x₁ : ℝ} (hx₀ : x₀ ≥ 2) (hx₀_le_x₁ 
   refine le_trans h_bound_x₀_x₁ <| Finset.sum_le_sum fun i hi => ?_
   rw [Finset.mem_Iio, Fin.lt_def] at hi
   have h_le : b i ≤ b (i + 1) := hmono (by
-    rw [Fin.le_iff_val_le_val, Fin.val_add]
-    have h_one : (1 : Fin (N + 1)).val = 1 % (N + 1) := rfl
-    rw [h_one]
-    have h1 : 1 < N + 1 := by omega
-    rw [Nat.mod_eq_of_lt h1]
-    have h2 : i.val + 1 < N + 1 := by omega
-    rw [Nat.mod_eq_of_lt h2]
-    omega)
+    rw [Fin.le_def, Fin.val_add_one_of_lt' (by linarith)]
+    linarith)
   have h_exp_le : exp (b i) ≤ exp (b (i + 1)) := exp_le_exp.mpr h_le
   have h_bound_x₀_x₁ : ∫ t in (exp (b i))..(exp (b (i + 1))), Eθ t / (log t) ^ 2 ≤ εθ_num (exp (b i)) * ∫ t in (exp (b i))..(exp (b (i + 1))), 1 / (log t) ^ 2 := by
     rw [intervalIntegral.integral_of_le h_exp_le, intervalIntegral.integral_of_le h_exp_le]
@@ -3265,20 +3257,15 @@ private lemma bound_x0_x1 {x₀ x₁ : ℝ} (hx₀ : x₀ ≥ 2) (hx₀_le_x₁ 
         exact exp_le_exp.mpr (hmono (Nat.zero_le i))
       · rw [← exp_log (by linarith : 0 < x₁), ← h_b_end]
         exact exp_le_exp.mpr (hmono (by
-          rw [Fin.le_iff_val_le_val, Fin.val_add]
-          have h_one : (1 : Fin (N + 1)).val = 1 % (N + 1) := rfl
-          rw [h_one]
-          have h1 : 1 < N + 1 := by omega
-          rw [Nat.mod_eq_of_lt h1]
-          have h2 : i.val + 1 < N + 1 := by omega
-          rw [Nat.mod_eq_of_lt h2]
-          omega))
+          rw [Fin.le_def, Fin.val_add_one_of_lt' (by linarith)]
+          linarith))
     · have h_ge_2 : 2 ≤ exp (b i) := h_exp_ge_2 i
       refine ContinuousOn.integrableOn_Icc ?_ |> fun h => h.mono_set Set.Ioc_subset_Icc_self
       have h_log : ∀ x ∈ Set.Icc (exp (b i)) (exp (b (i + 1))), log x ≠ 0 := by
         intro x hx
         have : x > 1 := by linarith [h_ge_2.trans hx.1]
         exact (Real.log_pos this).ne'
+      -- fun_prop (disch := grind)
       refine ContinuousOn.const_mul ?_ _
       refine ContinuousOn.div continuousOn_const ?_ ?_
       · refine continuousOn_of_forall_continuousAt fun x hx => ?_
@@ -3500,10 +3487,8 @@ private lemma integral_one_div_log_sq_le_const {x₁ s : ℝ} (hx₁ : 1 < x₁)
       have hlog : Real.log x₁ ≤ Real.log x :=
         Real.log_le_log (by linarith) hx.1
       have hlogx : 0 < Real.log x := hx₁'.trans_le hlog
-      rw [div_le_div_iff₀ (pow_pos hlogx 2) (pow_pos hx₁' 2)]
-      simp only [one_mul]
-      nlinarith [sq_nonneg (Real.log x - Real.log x₁)]
-  aesop
+      gcongr
+  simpa using h_bound
 
 private lemma log_gt_two_of_ge_14 {x₁ : ℝ} (h : 14 ≤ x₁) : 2 < Real.log x₁ := by
   have : (2 : ℝ) < Real.log 14 := by
@@ -3939,63 +3924,53 @@ theorem theorem_6_2 {x₁ : ℝ} (h : x₁ ≥ 14) (x : ℝ) (hx : x ≥ x₁) :
 theorem theorem_6_3 {x₁ : ℝ} (h : x₁ ≥ 14) (x₂ : ℝ) (hx₂ : x₂ ≥ x₁) (x : ℝ) (hx : x ≥ x₁) (hx' : x ≤ x₂) (hx₂' : x₂ ≤ x₁ * log x₁) :
   (log x / x) * ∫ t in x₁..x, 1 / (log t) ^ 2 ≤
     (log x₂ / x₂) * (Li x₂ - x₂ / log x₂ - Li x₁ + x₁ / log x₁) := by
-  have hx₁_gt_one : 1 < x₁ := by nlinarith [h]
-  have hlog_gt_one_of_ge : ∀ y, x₁ ≤ y → 1 < log y := by
-    intro y hy
-    grw [Real.lt_log_iff_exp_lt, Real.exp_one_lt_d9] <;> linarith
+  -- have hx₁ : 1 < x₁ := by linarith
+  -- have hderiv : ∀ y, x₁ ≤ y → HasDerivAt
+  --     (fun u => log u / u * (Li u - u / log u - Li x₁ + x₁ / log x₁))
+  --     (1 / (y * log y) - (log y - 1) / y ^ 2 * (Li y - y / log y - Li x₁ + x₁ / log x₁)) y := by
+  --   intro y hy
+  --   have hyne : y ≠ 0 := by linarith
+  --   have h₁ : HasDerivAt (fun u => log u / u) ((1 - log y) / y ^ 2) y := by
+  --     simpa [hyne] using (Real.hasDerivAt_log hyne).div (hasDerivAt_id y)
+  --   have h₂ : HasDerivAt (fun u => Li u - u / log u - Li x₁ + x₁ / log x₁) (1 / log y ^ 2) y := by
+  --     simpa using hasDerivAt_Li_sub_div_log (by linarith)
+  --   convert h₁.mul h₂ using 1
+  --   field
+  -- rw [integral_one_div_log_sq hx₁ hx, ← sub_add]
+  -- rcases eq_or_lt_of_le hx' with rfl | hlt
+  -- · simp
+  -- obtain ⟨c, hc, hc_slope⟩ := exists_hasDerivAt_eq_slope _ _ hlt
+  --   (HasDerivAt.continuousOn (fun t ht => hderiv t (by grind)))
+  --   (fun c hc => hderiv c (by grind))
+  -- rw [← sub_nonneg, ← eq_div_iff (by grind) |>.mp hc_slope]
+  -- refine mul_nonneg ?_ (by linarith)
+  -- have hcx₁ : x₁ ≤ c := by grind
+  -- have h6 := theorem_6_2 h c hcx₁
+  -- rw [integral_one_div_log_sq hx₁ hcx₁, ← sub_add, ← Real.log_mul (by grind) (by grind)] at h6
+  -- have : 1 < log c := by grw [Real.lt_log_iff_exp_lt, Real.exp_one_lt_d9] <;> linarith
+  -- have : 0 < log c - 1 := by linarith
+  -- have : 0 < c := by linarith
+  -- have : log c / c * (Li c - c / log c - Li x₁ + x₁ / log x₁) ≤ 1 / (log c - 1) := by
+  --   grw [h6]
+  --   gcongr
+  --   grind
+  -- simpa [mul_comm, field]
+    have h_integral_le_integral : (log x / x) * ∫ t in x₁..x, 1 / (log t) ^ 2 ≤ (log x / x) * (Li x - x / log x - Li x₁ + x₁ / log x₁) := by
+      rw [ integral_one_div_log_sq ] <;> try linarith;
+    have h_monotone : MonotoneOn (fun t => (log t / t) * (Li t - t / log t - Li x₁ + x₁ / log x₁)) (Set.Icc x₁ (x₁ * log x₁)) := by
+      have h_monotone : MonotoneOn (fun t => (log t / t) * ∫ s in x₁..t, 1 / (log s) ^ 2) (Set.Icc x₁ (x₁ * log x₁)) := by
+        apply_rules [ h_monotoneOn ];
+    -- Using the fact that the integral of 1/(log t)^2 from x₁ to t is equal to Li t - t / log t - Li x₁ + x₁ / log x₁, we can rewrite the function.
+      have h_integral_eq : ∀ t ∈ Set.Icc x₁ (x₁ * log x₁), ∫ s in x₁..t, 1 / (log s) ^ 2 = Li t - t / log t - Li x₁ + x₁ / log x₁ := by
+        intros t ht; rw [ integral_one_div_log_sq ]
+        · ring
+        · linarith
+        · linarith [ ht.1 ]
+      exact fun t ht u hu htu => by simpa only [ h_integral_eq t ht, h_integral_eq u hu ] using h_monotone ht hu htu;
+    exact h_integral_le_integral.trans ( h_monotone ⟨ by linarith, by linarith ⟩ ⟨ by linarith, by linarith ⟩ hx' )
 
-  have hderiv : ∀ y, x₁ ≤ y → HasDerivAt
-      (fun u => log u / u * (Li u - u / log u - Li x₁ + x₁ / log x₁))
-      (1 / (y * log y) - (log y - 1) / y ^ 2 * (Li y - y / log y - Li x₁ + x₁ / log x₁)) y := by
-    intro y hy
-    have hyne : y ≠ 0 := by linarith
-    have h₁ : HasDerivAt (fun u => log u / u) ((1 - log y) / y ^ 2) y := by
-      simpa [hyne] using (Real.hasDerivAt_log hyne).div (hasDerivAt_id y)
-    have h₂ : HasDerivAt (fun u => Li u - u / log u - Li x₁ + x₁ / log x₁) (1 / log y ^ 2) y := by
-      simpa using hasDerivAt_Li_sub_div_log (by linarith)
-    convert h₁.mul h₂ using 1
-    simp [field]
-    ring
-
-  rw [integral_one_div_log_sq (a := x₁) (b := x) hx₁_gt_one hx, ← sub_add]
-  rcases eq_or_lt_of_le hx' with rfl | hlt
-  · simp
-  obtain ⟨c, hc, hc_slope⟩ := exists_hasDerivAt_eq_slope _ _ hlt
-    (HasDerivAt.continuousOn (fun t ht => (hderiv t (by grind))))
-    (fun c hc => (hderiv c (by grind)))
-  rw [eq_div_iff (by grind)] at hc_slope
-  rw [← sub_nonneg, ← hc_slope]
-  have : (x₂ - x) > 0 := by grind
-  have hcx₁ : x₁ ≤ c := le_trans hx (le_of_lt hc.1)
-  have h6 := theorem_6_2 (x₁ := x₁) h c hcx₁
-  have hlogcsubpos : 1 < log c := by
-    grw [Real.lt_log_iff_exp_lt, Real.exp_one_lt_d9] <;> grind
-  have : 0 < log c - 1 := by linarith
-  have : 0 < c := by grind
-  rw [integral_one_div_log_sq (a := x₁) (b := c) hx₁_gt_one hcx₁, ← sub_add] at h6
-  have : 0 ≤ (1 / (c * log c) - (log c - 1) / c ^ 2 * (Li c - c / log c - Li x₁ + x₁ / log x₁)) := by
-    rw [← Real.log_mul (by linarith) (Real.log_pos (by linarith)).ne'] at h6
-    have h6c : log c / c * (Li c - c / log c - Li x₁ + x₁ / log x₁) < 1 / (log c - 1) := by
-      grw [h6]
-      gcongr
-      grind
-    rw [← lt_div_iff₀' (by positivity)] at h6c
-    grw [h6c]
-    simp [field]
-  positivity
-    -- have h_integral_le_integral : (log x / x) * ∫ t in x₁..x, 1 / (log t) ^ 2 ≤ (log x / x) * (Li x - x / log x - Li x₁ + x₁ / log x₁) := by
-    --   rw [ integral_one_div_log_sq ] <;> try linarith;
-    -- have h_monotone : MonotoneOn (fun t => (log t / t) * (Li t - t / log t - Li x₁ + x₁ / log x₁)) (Set.Icc x₁ (x₁ * log x₁)) := by
-    --   have h_monotone : MonotoneOn (fun t => (log t / t) * ∫ s in x₁..t, 1 / (log s) ^ 2) (Set.Icc x₁ (x₁ * log x₁)) := by
-    --     apply_rules [ h_monotoneOn ];
-    -- -- Using the fact that the integral of 1/(log t)^2 from x₁ to t is equal to Li t - t / log t - Li x₁ + x₁ / log x₁, we can rewrite the function.
-    --   have h_integral_eq : ∀ t ∈ Set.Icc x₁ (x₁ * log x₁), ∫ s in x₁..t, 1 / (log s) ^ 2 = Li t - t / log t - Li x₁ + x₁ / log x₁ := by
-    --     intros t ht; rw [ integral_one_div_log_sq ]
-    --     · ring
-    --     · linarith
-    --     · linarith [ ht.1 ]
-    --   exact fun t ht u hu htu => by simpa only [ h_integral_eq t ht, h_integral_eq u hu ] using h_monotone ht hu htu;
-    -- exact h_integral_le_integral.trans ( h_monotone ⟨ by linarith, by linarith ⟩ ⟨ by linarith, by linarith ⟩ hx' )
+-- #show_unused theorem_6_2 theorem_6_3 lemma_20_b lemma_20_a
+#print axioms theorem_6_2-- theorem_6_3 lemma_20_b lemma_20_a
 
 blueprint_comment /--
 We can merge these sublemmas together after making some definitions. -/
@@ -4214,7 +4189,7 @@ Since h_b_start : b' 0 = ↑(log x₁), we have (b' 0).toReal = (↑(log x₁)).
 lemma ereal_toReal_coe_log {x₁ : ℝ} {M : ℕ} (b' : Fin (M + 1) → EReal)
     (h_b_start : b' 0 = ↑(log x₁)) :
     (b' 0).toReal = log x₁ := by
-  aesop
+  simp_all
 
 /-
 PROBLEM
@@ -4315,36 +4290,30 @@ lemma corollary_8_apply_theorem_6 {x₁ : ℝ} (hx₁ : x₁ ≥ 14)
       have h_exp_le : Real.exp (b' ⟨i.val, by omega⟩).toReal ≤ Real.exp (Real.log x) := by
         apply_rules [ ereal_exp_toReal_le ];
         aesop
-      generalize_proofs at *; (
-      rwa [ Real.exp_log ( by linarith ) ] at h_exp_le);
+      rwa [ Real.exp_log ( by linarith ) ] at h_exp_le
   · convert theorem_6 _ _ _ _ _ _ _ _ _ _ _ using 1
     all_goals generalize_proofs at *;
     · convert ereal_exp_ge_max hx₁ _ _ _ _ using 1
       all_goals generalize_proofs at *;
       rotate_left
       · exact fun j => b' ⟨ j, by linarith [ Fin.is_lt j ] ⟩
-      · generalize_proofs at *
-        exact fun j k hjk => hmono <| by simpa using hjk
+      · exact fun j k hjk => hmono <| by simpa using hjk
       · apply_rules [ ereal_toReal_coe_log ]
       · exact i
       norm_num [ EReal.toReal_coe ] at *
-      exact Or.inl fun h => by have := h_finite _ h; aesop;
-    · generalize_proofs at *
-      convert ereal_toReal_sub_mono b' hmono i ( Real.log x ) hi_le _ using 1
-      generalize_proofs at *
+      exact Or.inl fun h => by have := h_finite _ h; simp_all;
+    · convert ereal_toReal_sub_mono b' hmono i ( Real.log x ) hi_le _ using 1
       aesop
     all_goals norm_num [ EReal.toReal_coe ] at *;
     · aesop;
     · exact fun j => h_εθ_num _;
     · have := @ereal_exp_toReal_le;
-      exact le_trans ( this b' hmono i ( Real.log x ) hi_le ( by aesop ) ) ( by rw [ Real.exp_log ( by linarith ) ] ) |> le_trans <| by linarith;
+      exact le_trans ( this b' hmono i ( Real.log x ) hi_le ( by simp_all ) ) ( by rw [ Real.exp_log ( by linarith ) ] ) |> le_trans <| by linarith;
     · have h_exp : Real.log x < (b' ⟨i.val + 1, by omega⟩).toReal := by
         have h_exp : b' ⟨i.val + 1, by omega⟩ ≠ ⊤ := by
-          exact fun h => ‹¬ ( i : ℕ ) + 1 = M› <| by have := h_finite _ h; aesop;
-        generalize_proofs at *; (
-        cases h : b' ⟨ i + 1, by linarith ⟩ <;> aesop)
-      generalize_proofs at *; (
-      rw [ ← Real.log_le_iff_le_exp ( by linarith ) ] ; linarith [ Real.log_le_log ( by linarith ) hx ] ;);
+          exact fun h => ‹¬ ( i : ℕ ) + 1 = M› <| by have := h_finite _ h; simp_all;
+        cases h : b' ⟨ i + 1, by linarith ⟩ <;> simp_all
+      rw [ ← Real.log_le_iff_le_exp ( by linarith ) ] ; linarith [ Real.log_le_log ( by linarith ) hx ]
 
 
 
@@ -4763,7 +4732,9 @@ theorem step_interval_bound {A C V x₁ x₂ : ℝ} (hA : 0 ≤ A) (hC : 0 < C)
   -/)
   (latexEnv := "corollary")
   (discussion := 721)]
-theorem corollary_22 : Eπ.classicalBound 9.2211 1.5 0.8476 1 2 := sorry
+theorem corollary_22 : Eπ.classicalBound 9.2211 1.5 0.8476 1 2 := by
+  have := theorem_3
+  sorry
 
 def table6 : List (List ℝ) := [[0.000120, 0.25, 1.00, 22.955],
                                  [0.826, 0.25, 1.00, 1.000],
